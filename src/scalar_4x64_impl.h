@@ -78,13 +78,13 @@ SECP256K1_INLINE static int secp256k1_scalar_reduce(secp256k1_scalar *r, unsigne
     VERIFY_CHECK(overflow <= 1);
 
     secp256k1_u128_from_u64(&t, r->d[0]);
-    secp256k1_u128_accum_u64(&t, overflow * SECP256K1_N_C_0);
+    secp256k1_u128_accum_u64(&t, (uint64_t)overflow * SECP256K1_N_C_0);
     r->d[0] = secp256k1_u128_to_u64(&t); secp256k1_u128_rshift(&t, 64);
     secp256k1_u128_accum_u64(&t, r->d[1]);
-    secp256k1_u128_accum_u64(&t, overflow * SECP256K1_N_C_1);
+    secp256k1_u128_accum_u64(&t, (uint64_t)overflow * SECP256K1_N_C_1);
     r->d[1] = secp256k1_u128_to_u64(&t); secp256k1_u128_rshift(&t, 64);
     secp256k1_u128_accum_u64(&t, r->d[2]);
-    secp256k1_u128_accum_u64(&t, overflow * SECP256K1_N_C_2);
+    secp256k1_u128_accum_u64(&t, (uint64_t)overflow * SECP256K1_N_C_2);
     r->d[2] = secp256k1_u128_to_u64(&t); secp256k1_u128_rshift(&t, 64);
     secp256k1_u128_accum_u64(&t, r->d[3]);
     r->d[3] = secp256k1_u128_to_u64(&t);
@@ -606,10 +606,8 @@ static void secp256k1_scalar_reduce_512(secp256k1_scalar *r, const uint64_t *l) 
     secp256k1_uint128 c128;
     uint64_t c, c0, c1, c2;
     uint64_t n0 = l[4], n1 = l[5], n2 = l[6], n3 = l[7];
-    uint64_t m0, m1, m2, m3, m4, m5;
-    uint32_t m6;
-    uint64_t p0, p1, p2, p3;
-    uint32_t p4;
+    uint64_t m0, m1, m2, m3, m4, m5, m6;
+    uint64_t p0, p1, p2, p3, p4;
 
     /* Reduce 512 bits into 385. */
     /* m[0..6] = l[0..3] + n[0..3] * SECP256K1_N_C. */
