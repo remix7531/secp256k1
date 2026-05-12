@@ -26,6 +26,20 @@ typedef struct {
     int64_t u, v, q, r;
 } secp256k1_modinv64_trans2x2;
 
+/* Replace the limbs of r with those of a.
+ *
+ * This is an explicit limb-by-limb copy rather than a plain aggregate struct
+ * assignment (r = a). The two are semantically identical, but the explicit form
+ * avoids the compiler-generated aggregate copy, which keeps the code amenable to
+ * formal verification (see proof/). */
+static SECP256K1_INLINE void secp256k1_modinv64_signed62_assign(secp256k1_modinv64_signed62 *r, const secp256k1_modinv64_signed62 *a) {
+    r->v[0] = a->v[0];
+    r->v[1] = a->v[1];
+    r->v[2] = a->v[2];
+    r->v[3] = a->v[3];
+    r->v[4] = a->v[4];
+}
+
 #ifdef VERIFY
 /* Helper function to compute the absolute value of an int64_t.
  * (we don't use abs/labs/llabs as it depends on the int sizes). */
@@ -589,10 +603,14 @@ static void secp256k1_modinv64(secp256k1_modinv64_signed62 *x, const secp256k1_m
     /* Start with d=0, e=1, f=modulus, g=x, zeta=-1. */
     secp256k1_modinv64_signed62 d = {{0, 0, 0, 0, 0}};
     secp256k1_modinv64_signed62 e = {{1, 0, 0, 0, 0}};
-    secp256k1_modinv64_signed62 f = modinfo->modulus;
-    secp256k1_modinv64_signed62 g = *x;
+    secp256k1_modinv64_signed62 f;
+    secp256k1_modinv64_signed62 g;
     int i;
     int64_t zeta = -1; /* zeta = -(delta+1/2); delta starts at 1/2. */
+
+    /* f=modulus, g=x. */
+    secp256k1_modinv64_signed62_assign(&f, &modinfo->modulus);
+    secp256k1_modinv64_signed62_assign(&g, x);
 
     /* Do 10 iterations of 59 divsteps each = 590 divsteps. This suffices for 256-bit inputs. */
     for (i = 0; i < 10; ++i) {
@@ -630,7 +648,7 @@ static void secp256k1_modinv64(secp256k1_modinv64_signed62 *x, const secp256k1_m
 
     /* Optionally negate d, normalize to [0,modulus), and return it. */
     secp256k1_modinv64_normalize_62(&d, f.v[4], modinfo);
-    *x = d;
+    secp256k1_modinv64_signed62_assign(x, &d);
 }
 
 /* Compute the inverse of x modulo modinfo->modulus, and replace x with it (variable time). */
@@ -638,14 +656,18 @@ static void secp256k1_modinv64_var(secp256k1_modinv64_signed62 *x, const secp256
     /* Start with d=0, e=1, f=modulus, g=x, eta=-1. */
     secp256k1_modinv64_signed62 d = {{0, 0, 0, 0, 0}};
     secp256k1_modinv64_signed62 e = {{1, 0, 0, 0, 0}};
-    secp256k1_modinv64_signed62 f = modinfo->modulus;
-    secp256k1_modinv64_signed62 g = *x;
+    secp256k1_modinv64_signed62 f;
+    secp256k1_modinv64_signed62 g;
 #ifdef VERIFY
     int i = 0;
 #endif
     int j, len = 5;
     int64_t eta = -1; /* eta = -delta; delta is initially 1 */
     int64_t cond, fn, gn;
+
+    /* f=modulus, g=x. */
+    secp256k1_modinv64_signed62_assign(&f, &modinfo->modulus);
+    secp256k1_modinv64_signed62_assign(&g, x);
 
     /* Do iterations of 62 divsteps each until g=0. */
     while (1) {
@@ -706,7 +728,7 @@ static void secp256k1_modinv64_var(secp256k1_modinv64_signed62 *x, const secp256
 
     /* Optionally negate d, normalize to [0,modulus), and return it. */
     secp256k1_modinv64_normalize_62(&d, f.v[len - 1], modinfo);
-    *x = d;
+    secp256k1_modinv64_signed62_assign(x, &d);
 }
 
 /* Do up to 25 iterations of 62 posdivsteps (up to 1550 steps; more is extremely rare) each until f=1.
@@ -720,13 +742,17 @@ static void secp256k1_modinv64_var(secp256k1_modinv64_signed62 *x, const secp256
 /* Compute the Jacobi symbol of x modulo modinfo->modulus (variable time). gcd(x,modulus) must be 1. */
 static int secp256k1_jacobi64_maybe_var(const secp256k1_modinv64_signed62 *x, const secp256k1_modinv64_modinfo *modinfo) {
     /* Start with f=modulus, g=x, eta=-1. */
-    secp256k1_modinv64_signed62 f = modinfo->modulus;
-    secp256k1_modinv64_signed62 g = *x;
+    secp256k1_modinv64_signed62 f;
+    secp256k1_modinv64_signed62 g;
     int j, len = 5;
     int64_t eta = -1; /* eta = -delta; delta is initially 1 */
     int64_t cond, fn, gn;
     int jac = 0;
     int count;
+
+    /* f=modulus, g=x. */
+    secp256k1_modinv64_signed62_assign(&f, &modinfo->modulus);
+    secp256k1_modinv64_signed62_assign(&g, x);
 
     /* The input limbs must all be non-negative. */
     VERIFY_CHECK(g.v[0] >= 0 && g.v[1] >= 0 && g.v[2] >= 0 && g.v[3] >= 0 && g.v[4] >= 0);
