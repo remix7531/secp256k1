@@ -892,6 +892,25 @@ SECP256K1_INLINE static int secp256k1_scalar_eq(const secp256k1_scalar *a, const
     return ((a->d[0] ^ b->d[0]) | (a->d[1] ^ b->d[1]) | (a->d[2] ^ b->d[2]) | (a->d[3] ^ b->d[3])) == 0;
 }
 
+/** Extract limb [j] of the 512-bit value [l] shifted right by [shift] bits.
+ *  [shiftlimbs]/[shiftlow]/[shifthigh] are the precomputed [shift>>6],
+ *  [shift&0x3F] and [64-shiftlow]; [lo]/[hi] are the per-limb cutoffs
+ *  ([512-64*j] and [448-64*j]) above which the limb is fully shifted out or
+ *  needs no high-half contribution.  Historically four near-identical inline
+ *  ternaries; expressed here as one function so the limb-extraction can be
+ *  given a single separate-compilation contract and formally verified, while
+ *  compiling to the same code. */
+static SECP256K1_INLINE uint64_t secp256k1_scalar_shift_limb(const uint64_t *l, unsigned int shift, unsigned int shiftlimbs, unsigned int shiftlow, unsigned int shifthigh, unsigned int j, unsigned int lo, unsigned int hi) {
+    uint64_t result = 0;
+    if (shift < lo) {
+        result = l[j + shiftlimbs] >> shiftlow;
+        if (shift < hi && shiftlow) {
+            result |= l[j + 1 + shiftlimbs] << shifthigh;
+        }
+    }
+    return result;
+}
+
 SECP256K1_INLINE static void secp256k1_scalar_mul_shift_var(secp256k1_scalar *r, const secp256k1_scalar *a, const secp256k1_scalar *b, unsigned int shift) {
     uint64_t l[8];
     unsigned int shiftlimbs;
@@ -905,10 +924,10 @@ SECP256K1_INLINE static void secp256k1_scalar_mul_shift_var(secp256k1_scalar *r,
     shiftlimbs = shift >> 6;
     shiftlow = shift & 0x3F;
     shifthigh = 64 - shiftlow;
-    r->d[0] = shift < 512 ? (l[0 + shiftlimbs] >> shiftlow | (shift < 448 && shiftlow ? (l[1 + shiftlimbs] << shifthigh) : 0)) : 0;
-    r->d[1] = shift < 448 ? (l[1 + shiftlimbs] >> shiftlow | (shift < 384 && shiftlow ? (l[2 + shiftlimbs] << shifthigh) : 0)) : 0;
-    r->d[2] = shift < 384 ? (l[2 + shiftlimbs] >> shiftlow | (shift < 320 && shiftlow ? (l[3 + shiftlimbs] << shifthigh) : 0)) : 0;
-    r->d[3] = shift < 320 ? (l[3 + shiftlimbs] >> shiftlow) : 0;
+    r->d[0] = secp256k1_scalar_shift_limb(l, shift, shiftlimbs, shiftlow, shifthigh, 0, 512, 448);
+    r->d[1] = secp256k1_scalar_shift_limb(l, shift, shiftlimbs, shiftlow, shifthigh, 1, 448, 384);
+    r->d[2] = secp256k1_scalar_shift_limb(l, shift, shiftlimbs, shiftlow, shifthigh, 2, 384, 320);
+    r->d[3] = secp256k1_scalar_shift_limb(l, shift, shiftlimbs, shiftlow, shifthigh, 3, 320, 256);
     secp256k1_scalar_cadd_bit(r, 0, (l[(shift - 1) >> 6] >> ((shift - 1) & 0x3f)) & 1);
 
     SECP256K1_SCALAR_VERIFY(r);
