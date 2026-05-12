@@ -415,6 +415,19 @@ static int64_t secp256k1_modinv64_posdivsteps_62_var(int64_t eta, uint64_t f0, u
     return eta;
 }
 
+/* Accumulate the limb-n products of t*[d,e]+modulus*[md,me] into cd and ce, skipping
+ * the modulus terms when that limb of the modulus is zero. */
+static SECP256K1_INLINE void secp256k1_modinv64_update_de_limb(secp256k1_int128 *cd, secp256k1_int128 *ce, int64_t u, int64_t v, int64_t q, int64_t r, int64_t dn, int64_t en, int64_t md, int64_t me, int64_t mod_n) {
+    secp256k1_i128_accum_mul(cd, u, dn);
+    secp256k1_i128_accum_mul(cd, v, en);
+    secp256k1_i128_accum_mul(ce, q, dn);
+    secp256k1_i128_accum_mul(ce, r, en);
+    if (mod_n) { /* Optimize for the case where limb of modulus is zero. */
+        secp256k1_i128_accum_mul(cd, mod_n, md);
+        secp256k1_i128_accum_mul(ce, mod_n, me);
+    }
+}
+
 /* Compute (t/2^62) * [d, e] mod modulus, where t is a transition matrix scaled by 2^62.
  *
  * On input and output, d and e are in range (-2*modulus,modulus). All output limbs will be in range
@@ -456,45 +469,19 @@ static void secp256k1_modinv64_update_de_62(secp256k1_modinv64_signed62 *d, secp
     VERIFY_CHECK((secp256k1_i128_to_u64(&cd) & M62) == 0); secp256k1_i128_rshift(&cd, 62);
     VERIFY_CHECK((secp256k1_i128_to_u64(&ce) & M62) == 0); secp256k1_i128_rshift(&ce, 62);
     /* Compute limb 1 of t*[d,e]+modulus*[md,me], and store it as output limb 0 (= down shift). */
-    secp256k1_i128_accum_mul(&cd, u, d1);
-    secp256k1_i128_accum_mul(&cd, v, e1);
-    secp256k1_i128_accum_mul(&ce, q, d1);
-    secp256k1_i128_accum_mul(&ce, r, e1);
-    if (modinfo->modulus.v[1]) { /* Optimize for the case where limb of modulus is zero. */
-        secp256k1_i128_accum_mul(&cd, modinfo->modulus.v[1], md);
-        secp256k1_i128_accum_mul(&ce, modinfo->modulus.v[1], me);
-    }
+    secp256k1_modinv64_update_de_limb(&cd, &ce, u, v, q, r, d1, e1, md, me, modinfo->modulus.v[1]);
     d->v[0] = secp256k1_i128_to_u64(&cd) & M62; secp256k1_i128_rshift(&cd, 62);
     e->v[0] = secp256k1_i128_to_u64(&ce) & M62; secp256k1_i128_rshift(&ce, 62);
     /* Compute limb 2 of t*[d,e]+modulus*[md,me], and store it as output limb 1. */
-    secp256k1_i128_accum_mul(&cd, u, d2);
-    secp256k1_i128_accum_mul(&cd, v, e2);
-    secp256k1_i128_accum_mul(&ce, q, d2);
-    secp256k1_i128_accum_mul(&ce, r, e2);
-    if (modinfo->modulus.v[2]) { /* Optimize for the case where limb of modulus is zero. */
-        secp256k1_i128_accum_mul(&cd, modinfo->modulus.v[2], md);
-        secp256k1_i128_accum_mul(&ce, modinfo->modulus.v[2], me);
-    }
+    secp256k1_modinv64_update_de_limb(&cd, &ce, u, v, q, r, d2, e2, md, me, modinfo->modulus.v[2]);
     d->v[1] = secp256k1_i128_to_u64(&cd) & M62; secp256k1_i128_rshift(&cd, 62);
     e->v[1] = secp256k1_i128_to_u64(&ce) & M62; secp256k1_i128_rshift(&ce, 62);
     /* Compute limb 3 of t*[d,e]+modulus*[md,me], and store it as output limb 2. */
-    secp256k1_i128_accum_mul(&cd, u, d3);
-    secp256k1_i128_accum_mul(&cd, v, e3);
-    secp256k1_i128_accum_mul(&ce, q, d3);
-    secp256k1_i128_accum_mul(&ce, r, e3);
-    if (modinfo->modulus.v[3]) { /* Optimize for the case where limb of modulus is zero. */
-        secp256k1_i128_accum_mul(&cd, modinfo->modulus.v[3], md);
-        secp256k1_i128_accum_mul(&ce, modinfo->modulus.v[3], me);
-    }
+    secp256k1_modinv64_update_de_limb(&cd, &ce, u, v, q, r, d3, e3, md, me, modinfo->modulus.v[3]);
     d->v[2] = secp256k1_i128_to_u64(&cd) & M62; secp256k1_i128_rshift(&cd, 62);
     e->v[2] = secp256k1_i128_to_u64(&ce) & M62; secp256k1_i128_rshift(&ce, 62);
     /* Compute limb 4 of t*[d,e]+modulus*[md,me], and store it as output limb 3. */
-    secp256k1_i128_accum_mul(&cd, u, d4);
-    secp256k1_i128_accum_mul(&cd, v, e4);
-    secp256k1_i128_accum_mul(&ce, q, d4);
-    secp256k1_i128_accum_mul(&ce, r, e4);
-    secp256k1_i128_accum_mul(&cd, modinfo->modulus.v[4], md);
-    secp256k1_i128_accum_mul(&ce, modinfo->modulus.v[4], me);
+    secp256k1_modinv64_update_de_limb(&cd, &ce, u, v, q, r, d4, e4, md, me, modinfo->modulus.v[4]);
     d->v[3] = secp256k1_i128_to_u64(&cd) & M62; secp256k1_i128_rshift(&cd, 62);
     e->v[3] = secp256k1_i128_to_u64(&ce) & M62; secp256k1_i128_rshift(&ce, 62);
     /* What remains is limb 5 of t*[d,e]+modulus*[md,me]; store it as output limb 4. */
