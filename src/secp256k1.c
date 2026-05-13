@@ -267,7 +267,7 @@ int secp256k1_ec_pubkey_parse(const secp256k1_context* ctx, secp256k1_pubkey* pu
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(pubkey != NULL);
-    memset(pubkey, 0, sizeof(*pubkey));
+    secp256k1_memset(pubkey, 0, sizeof(*pubkey));
     ARG_CHECK(input != NULL);
     switch (inputlen) {
         case 33: is_pubkey_valid = secp256k1_ge_parse33(&Q, input); break;
@@ -295,7 +295,7 @@ int secp256k1_ec_pubkey_serialize(const secp256k1_context* ctx, unsigned char *o
     len = *outputlen;
     *outputlen = 0;
     ARG_CHECK(output != NULL);
-    memset(output, 0, len);
+    secp256k1_memset(output, 0, len);
     ARG_CHECK(pubkey != NULL);
     ARG_CHECK((flags & SECP256K1_FLAGS_TYPE_MASK) == SECP256K1_FLAGS_TYPE_COMPRESSION);
     if (secp256k1_pubkey_load(ctx, &Q, pubkey)) {
@@ -331,7 +331,7 @@ int secp256k1_ec_pubkey_cmp(const secp256k1_context* ctx, const secp256k1_pubkey
              * zero in that case, but it's not guaranteed by the API, we can't
              * test it and writing a VERIFY_CHECK is more complex than
              * explicitly memsetting (again). */
-            memset(out[i], 0, sizeof(out[i]));
+            secp256k1_memset(out[i], 0, sizeof(out[i]));
         }
     }
     return secp256k1_memcmp_var(out[0], out[1], sizeof(out[0]));
@@ -376,8 +376,8 @@ static void secp256k1_ecdsa_signature_load(const secp256k1_context* ctx, secp256
         /* When the secp256k1_scalar type is exactly 32 byte, use its
          * representation inside secp256k1_ecdsa_signature, as conversion is very fast.
          * Note that secp256k1_ecdsa_signature_save must use the same representation. */
-        memcpy(r, &sig->data[0], 32);
-        memcpy(s, &sig->data[32], 32);
+        secp256k1_memcpy(r, &sig->data[0], 32);
+        secp256k1_memcpy(s, &sig->data[32], 32);
     } else {
         secp256k1_scalar_set_b32(r, &sig->data[0], NULL);
         secp256k1_scalar_set_b32(s, &sig->data[32], NULL);
@@ -386,8 +386,8 @@ static void secp256k1_ecdsa_signature_load(const secp256k1_context* ctx, secp256
 
 static void secp256k1_ecdsa_signature_save(secp256k1_ecdsa_signature* sig, const secp256k1_scalar* r, const secp256k1_scalar* s) {
     if (sizeof(secp256k1_scalar) == 32) {
-        memcpy(&sig->data[0], r, 32);
-        memcpy(&sig->data[32], s, 32);
+        secp256k1_memcpy(&sig->data[0], r, 32);
+        secp256k1_memcpy(&sig->data[32], s, 32);
     } else {
         secp256k1_scalar_get_b32(&sig->data[0], r);
         secp256k1_scalar_get_b32(&sig->data[32], s);
@@ -405,7 +405,7 @@ int secp256k1_ecdsa_signature_parse_der(const secp256k1_context* ctx, secp256k1_
         secp256k1_ecdsa_signature_save(sig, &r, &s);
         return 1;
     } else {
-        memset(sig, 0, sizeof(*sig));
+        secp256k1_memset(sig, 0, sizeof(*sig));
         return 0;
     }
 }
@@ -426,7 +426,7 @@ int secp256k1_ecdsa_signature_parse_compact(const secp256k1_context* ctx, secp25
     if (ret) {
         secp256k1_ecdsa_signature_save(sig, &r, &s);
     } else {
-        memset(sig, 0, sizeof(*sig));
+        secp256k1_memset(sig, 0, sizeof(*sig));
     }
     return ret;
 }
@@ -492,7 +492,7 @@ int secp256k1_ecdsa_verify(const secp256k1_context* ctx, const secp256k1_ecdsa_s
 }
 
 static SECP256K1_INLINE void buffer_append(unsigned char *buf, unsigned int *offset, const void *data, unsigned int len) {
-    memcpy(buf + *offset, data, len);
+    secp256k1_memcpy(buf + *offset, data, len);
     *offset += len;
 }
 
@@ -641,7 +641,7 @@ int secp256k1_ec_pubkey_create(const secp256k1_context* ctx, secp256k1_pubkey *p
     int ret = 0;
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(pubkey != NULL);
-    memset(pubkey, 0, sizeof(*pubkey));
+    secp256k1_memset(pubkey, 0, sizeof(*pubkey));
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
     ARG_CHECK(seckey != NULL);
 
@@ -675,7 +675,7 @@ int secp256k1_ec_pubkey_negate(const secp256k1_context* ctx, secp256k1_pubkey *p
     ARG_CHECK(pubkey != NULL);
 
     ret = secp256k1_pubkey_load(ctx, &p, pubkey);
-    memset(pubkey, 0, sizeof(*pubkey));
+    secp256k1_memset(pubkey, 0, sizeof(*pubkey));
     if (ret) {
         secp256k1_ge_neg(&p, &p);
         secp256k1_pubkey_save(pubkey, &p);
@@ -726,7 +726,7 @@ int secp256k1_ec_pubkey_tweak_add(const secp256k1_context* ctx, secp256k1_pubkey
     ARG_CHECK(tweak32 != NULL);
 
     ret = secp256k1_pubkey_load(ctx, &p, pubkey);
-    memset(pubkey, 0, sizeof(*pubkey));
+    secp256k1_memset(pubkey, 0, sizeof(*pubkey));
     ret = ret && secp256k1_ec_pubkey_tweak_add_helper(&p, tweak32);
     if (ret) {
         secp256k1_pubkey_save(pubkey, &p);
@@ -766,7 +766,7 @@ int secp256k1_ec_pubkey_tweak_mul(const secp256k1_context* ctx, secp256k1_pubkey
 
     secp256k1_scalar_set_b32(&factor, tweak32, &overflow);
     ret = !overflow && secp256k1_pubkey_load(ctx, &p, pubkey);
-    memset(pubkey, 0, sizeof(*pubkey));
+    secp256k1_memset(pubkey, 0, sizeof(*pubkey));
     if (ret) {
         if (secp256k1_eckey_pubkey_tweak_mul(&p, &factor)) {
             secp256k1_pubkey_save(pubkey, &p);
@@ -795,7 +795,7 @@ int secp256k1_ec_pubkey_combine(const secp256k1_context* ctx, secp256k1_pubkey *
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(pubnonce != NULL);
-    memset(pubnonce, 0, sizeof(*pubnonce));
+    secp256k1_memset(pubnonce, 0, sizeof(*pubnonce));
     ARG_CHECK(n >= 1);
     ARG_CHECK(pubnonces != NULL);
 

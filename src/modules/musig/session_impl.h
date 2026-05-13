@@ -6,7 +6,6 @@
 #ifndef SECP256K1_MODULE_MUSIG_SESSION_IMPL_H
 #define SECP256K1_MODULE_MUSIG_SESSION_IMPL_H
 
-#include <string.h>
 
 #include "../../../include/secp256k1.h"
 #include "../../../include/secp256k1_extrakeys.h"
@@ -22,7 +21,7 @@
 static const unsigned char secp256k1_musig_secnonce_magic[4] = { 0x22, 0x0e, 0xdc, 0xf1 };
 
 static void secp256k1_musig_secnonce_save(secp256k1_musig_secnonce *secnonce, const secp256k1_scalar *k, const secp256k1_ge *pk) {
-    memcpy(&secnonce->data[0], secp256k1_musig_secnonce_magic, 4);
+    secp256k1_memcpy(&secnonce->data[0], secp256k1_musig_secnonce_magic, 4);
     secp256k1_scalar_get_b32(&secnonce->data[4], &k[0]);
     secp256k1_scalar_get_b32(&secnonce->data[36], &k[1]);
     secp256k1_ge_to_bytes(&secnonce->data[68], pk);
@@ -61,7 +60,7 @@ static const unsigned char secp256k1_musig_pubnonce_magic[4] = { 0xf5, 0x7a, 0x3
  * group elements is infinity. */
 static void secp256k1_musig_pubnonce_save(secp256k1_musig_pubnonce* nonce, const secp256k1_ge* ges) {
     int i;
-    memcpy(&nonce->data[0], secp256k1_musig_pubnonce_magic, 4);
+    secp256k1_memcpy(&nonce->data[0], secp256k1_musig_pubnonce_magic, 4);
     for (i = 0; i < 2; i++) {
         secp256k1_ge_to_bytes(nonce->data + 4+64*i, &ges[i]);
     }
@@ -83,7 +82,7 @@ static const unsigned char secp256k1_musig_aggnonce_magic[4] = { 0xa8, 0xb7, 0xe
 
 static void secp256k1_musig_aggnonce_save(secp256k1_musig_aggnonce* nonce, const secp256k1_ge* ges) {
     int i;
-    memcpy(&nonce->data[0], secp256k1_musig_aggnonce_magic, 4);
+    secp256k1_memcpy(&nonce->data[0], secp256k1_musig_aggnonce_magic, 4);
     for (i = 0; i < 2; i++) {
         secp256k1_ge_to_bytes_ext(&nonce->data[4 + 64*i], &ges[i]);
     }
@@ -112,11 +111,11 @@ static const unsigned char secp256k1_musig_session_cache_magic[4] = { 0x9d, 0xed
 static void secp256k1_musig_session_save(secp256k1_musig_session *session, const secp256k1_musig_session_internal *session_i) {
     unsigned char *ptr = session->data;
 
-    memcpy(ptr, secp256k1_musig_session_cache_magic, 4);
+    secp256k1_memcpy(ptr, secp256k1_musig_session_cache_magic, 4);
     ptr += 4;
     *ptr = session_i->fin_nonce_parity;
     ptr += 1;
-    memcpy(ptr, session_i->fin_nonce, 32);
+    secp256k1_memcpy(ptr, session_i->fin_nonce, 32);
     ptr += 32;
     secp256k1_scalar_get_b32(ptr, &session_i->noncecoef);
     ptr += 32;
@@ -132,7 +131,7 @@ static int secp256k1_musig_session_load(const secp256k1_context* ctx, secp256k1_
     ptr += 4;
     session_i->fin_nonce_parity = *ptr;
     ptr += 1;
-    memcpy(session_i->fin_nonce, ptr, 32);
+    secp256k1_memcpy(session_i->fin_nonce, ptr, 32);
     ptr += 32;
     secp256k1_scalar_set_b32(&session_i->noncecoef, ptr, NULL);
     ptr += 32;
@@ -145,7 +144,7 @@ static int secp256k1_musig_session_load(const secp256k1_context* ctx, secp256k1_
 static const unsigned char secp256k1_musig_partial_sig_magic[4] = { 0xeb, 0xfb, 0x1a, 0x32 };
 
 static void secp256k1_musig_partial_sig_save(secp256k1_musig_partial_sig* sig, secp256k1_scalar *s) {
-    memcpy(&sig->data[0], secp256k1_musig_partial_sig_magic, 4);
+    secp256k1_memcpy(&sig->data[0], secp256k1_musig_partial_sig_magic, 4);
     secp256k1_scalar_get_b32(&sig->data[4], s);
 }
 
@@ -185,7 +184,7 @@ int secp256k1_musig_pubnonce_serialize(const secp256k1_context* ctx, unsigned ch
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(out66 != NULL);
-    memset(out66, 0, 66);
+    secp256k1_memset(out66, 0, 66);
     ARG_CHECK(nonce != NULL);
 
     if (!secp256k1_musig_pubnonce_load(ctx, ges, nonce)) {
@@ -221,7 +220,7 @@ int secp256k1_musig_aggnonce_serialize(const secp256k1_context* ctx, unsigned ch
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(out66 != NULL);
-    memset(out66, 0, 66);
+    secp256k1_memset(out66, 0, 66);
     ARG_CHECK(nonce != NULL);
 
     if (!secp256k1_musig_aggnonce_load(ctx, ges, nonce)) {
@@ -242,7 +241,7 @@ int secp256k1_musig_partial_sig_parse(const secp256k1_context* ctx, secp256k1_mu
 
     /* Ensure that using the signature will fail if parsing fails (and the user
      * doesn't check the return value). */
-    memset(sig, 0, sizeof(*sig));
+    secp256k1_memset(sig, 0, sizeof(*sig));
 
     secp256k1_scalar_set_b32(&tmp, in32, &overflow);
     if (overflow) {
@@ -258,7 +257,7 @@ int secp256k1_musig_partial_sig_serialize(const secp256k1_context* ctx, unsigned
     ARG_CHECK(sig != NULL);
     ARG_CHECK(secp256k1_memcmp_var(&sig->data[0], secp256k1_musig_partial_sig_magic, 4) == 0);
 
-    memcpy(out32, &sig->data[4], 32);
+    secp256k1_memcpy(out32, &sig->data[4], 32);
     return 1;
 }
 
@@ -314,7 +313,7 @@ static void secp256k1_nonce_function_musig(const secp256k1_hash_ctx *hash_ctx, s
             rand[i] ^= seckey32[i];
         }
     } else {
-        memcpy(rand, session_secrand, sizeof(rand));
+        secp256k1_memcpy(rand, session_secrand, sizeof(rand));
     }
 
     secp256k1_nonce_function_musig_sha256_tagged(&sha);
@@ -355,7 +354,7 @@ static int secp256k1_musig_nonce_gen_internal(const secp256k1_context* ctx, secp
     int ret = 1;
 
     ARG_CHECK(pubnonce != NULL);
-    memset(pubnonce, 0, sizeof(*pubnonce));
+    secp256k1_memset(pubnonce, 0, sizeof(*pubnonce));
     ARG_CHECK(pubkey != NULL);
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
 
@@ -413,7 +412,7 @@ int secp256k1_musig_nonce_gen(const secp256k1_context* ctx, secp256k1_musig_secn
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secnonce != NULL);
-    memset(secnonce, 0, sizeof(*secnonce));
+    secp256k1_memset(secnonce, 0, sizeof(*secnonce));
     ARG_CHECK(session_secrand32 != NULL);
 
     /* Check in constant time that the session_secrand32 is not 0 as a
@@ -444,7 +443,7 @@ int secp256k1_musig_nonce_gen_counter(const secp256k1_context* ctx, secp256k1_mu
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secnonce != NULL);
-    memset(secnonce, 0, sizeof(*secnonce));
+    secp256k1_memset(secnonce, 0, sizeof(*secnonce));
     ARG_CHECK(keypair != NULL);
 
     secp256k1_write_be64(buf, nonrepeating_cnt);
@@ -592,7 +591,7 @@ int secp256k1_musig_nonce_process(const secp256k1_context* ctx, secp256k1_musig_
         }
         session_i.s_part = e_tmp;
     }
-    memcpy(session_i.fin_nonce, fin_nonce, sizeof(session_i.fin_nonce));
+    secp256k1_memcpy(session_i.fin_nonce, fin_nonce, sizeof(session_i.fin_nonce));
     secp256k1_musig_session_save(session, &session_i);
     return 1;
 }
@@ -760,7 +759,7 @@ int secp256k1_musig_partial_sig_agg(const secp256k1_context* ctx, unsigned char 
         secp256k1_scalar_add(&session_i.s_part, &session_i.s_part, &term);
     }
     secp256k1_scalar_get_b32(&sig64[32], &session_i.s_part);
-    memcpy(&sig64[0], session_i.fin_nonce, 32);
+    secp256k1_memcpy(&sig64[0], session_i.fin_nonce, 32);
     return 1;
 }
 

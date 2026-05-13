@@ -8,7 +8,6 @@
 #define SECP256K1_HSORT_H
 
 #include <stddef.h>
-#include <string.h>
 
 /* In-place, iterative heapsort with an interface matching glibc's qsort_r. This
  * is preferred over standard library implementations because they generally

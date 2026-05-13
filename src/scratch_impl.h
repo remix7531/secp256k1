@@ -21,8 +21,8 @@ static secp256k1_scratch* secp256k1_scratch_create(const secp256k1_callback* err
     alloc = checked_malloc(error_callback, base_alloc + size);
     ret = (secp256k1_scratch *)alloc;
     if (ret != NULL) {
-        memset(ret, 0, sizeof(*ret));
-        memcpy(ret->magic, "scratch", 8);
+        secp256k1_memset(ret, 0, sizeof(*ret));
+        secp256k1_memcpy(ret->magic, "scratch", 8);
         ret->data = (void *) ((char *) alloc + base_alloc);
         ret->max_size = size;
     }
@@ -36,7 +36,7 @@ static void secp256k1_scratch_destroy(const secp256k1_callback* error_callback, 
             return;
         }
         VERIFY_CHECK(scratch->alloc_size == 0); /* all checkpoints should be applied */
-        memset(scratch->magic, 0, sizeof(scratch->magic));
+        secp256k1_memset(scratch->magic, 0, sizeof(scratch->magic));
         free(scratch);
     }
 }
@@ -96,7 +96,7 @@ static void *secp256k1_scratch_alloc(const secp256k1_callback* error_callback, s
         return NULL;
     }
     ret = (void *) ((char *) scratch->data + scratch->alloc_size);
-    memset(ret, 0, size);
+    secp256k1_memset(ret, 0, size);
     scratch->alloc_size += size;
 
     return ret;

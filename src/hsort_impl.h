@@ -26,9 +26,9 @@ static SECP256K1_INLINE size_t secp256k1_heap_child2(size_t i) {
 static SECP256K1_INLINE void secp256k1_heap_swap64(unsigned char *a, unsigned char *b, size_t len) {
     unsigned char tmp[64];
     VERIFY_CHECK(len <= 64);
-    memcpy(tmp, a, len);
-    memmove(a, b, len);
-    memcpy(b, tmp, len);
+    secp256k1_memcpy(tmp, a, len);
+    secp256k1_memmove(a, b, len);
+    secp256k1_memcpy(b, tmp, len);
 }
 
 static SECP256K1_INLINE void secp256k1_heap_swap(unsigned char *arr, size_t i, size_t j, size_t stride) {

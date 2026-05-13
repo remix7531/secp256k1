@@ -63,7 +63,7 @@ static void secp256k1_ecmult_gen_gej(const secp256k1_ecmult_gen_context *ecmult_
     uint32_t recoded[(COMB_BITS + 31) >> 5] = {0};
     int first = 1, i;
 
-    memset(&adds, 0, sizeof(adds));
+    secp256k1_memset(&adds, 0, sizeof(adds));
 
     /* We want to compute R = gn*G.
      *
@@ -316,7 +316,7 @@ static void secp256k1_ecmult_gen_blind(secp256k1_ecmult_gen_context *ecmult_gen_
      *   asking the caller for blinding values directly and expecting them to retry on failure.
      */
     VERIFY_CHECK(seed32 != NULL);
-    memcpy(keydata + 32, seed32, 32);
+    secp256k1_memcpy(keydata + 32, seed32, 32);
     secp256k1_rfc6979_hmac_sha256_initialize(hash_ctx, &rng, keydata, 64);
     secp256k1_memclear_explicit(keydata, sizeof(keydata));
 

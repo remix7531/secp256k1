@@ -7,7 +7,6 @@
 #ifndef SECP256K1_ECMULT_IMPL_H
 #define SECP256K1_ECMULT_IMPL_H
 
-#include <string.h>
 #include <stdint.h>
 
 #include "util.h"

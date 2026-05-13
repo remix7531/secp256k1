@@ -415,7 +415,7 @@ int secp256k1_ellswift_encode(const secp256k1_context *ctx, unsigned char *ell64
         return 1;
     }
     /* Only reached in case the provided pubkey is invalid. */
-    memset(ell64, 0, 64);
+    secp256k1_memset(ell64, 0, 64);
     return 0;
 }
 
@@ -439,7 +439,7 @@ int secp256k1_ellswift_create(const secp256k1_context *ctx, unsigned char *ell64
     /* Sanity check inputs. */
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(ell64 != NULL);
-    memset(ell64, 0, 64);
+    secp256k1_memset(ell64, 0, 64);
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
     ARG_CHECK(seckey32 != NULL);
 
