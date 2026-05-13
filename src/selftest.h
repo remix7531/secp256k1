@@ -9,7 +9,6 @@
 
 #include "hash.h"
 
-#include <string.h>
 
 static int secp256k1_selftest_sha256(secp256k1_sha256_compression_function fn_compression) {
     secp256k1_hash_ctx hash_ctx;

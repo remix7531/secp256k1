@@ -232,6 +232,18 @@ static SECP256K1_INLINE void secp256k1_memczero(void *s, size_t len, int flag) {
     }
 }
 
+static SECP256K1_INLINE void *secp256k1_memcpy(void *dst, const void *src, size_t n) {
+    return memcpy(dst, src, n);
+}
+
+static SECP256K1_INLINE void *secp256k1_memset(void *dst, int c, size_t n) {
+    return memset(dst, c, n);
+}
+
+static SECP256K1_INLINE void *secp256k1_memmove(void *dst, const void *src, size_t n) {
+    return memmove(dst, src, n);
+}
+
 /* Zeroes memory to prevent leaking sensitive info. Won't be optimized out. */
 static SECP256K1_INLINE void secp256k1_memzero_explicit(void *ptr, size_t len) {
 #if defined(_MSC_VER)

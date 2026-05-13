@@ -128,7 +128,7 @@ static int secp256k1_der_parse_integer(secp256k1_scalar *r, const unsigned char 
         overflow = 1;
     }
     if (!overflow) {
-        if (rlen) memcpy(ra + 32 - rlen, *sig, rlen);
+        if (rlen) secp256k1_memcpy(ra + 32 - rlen, *sig, rlen);
         secp256k1_scalar_set_b32(r, ra, &overflow);
     }
     if (overflow) {
@@ -185,10 +185,10 @@ static int secp256k1_ecdsa_sig_serialize(unsigned char *sig, size_t *size, const
     sig[1] = 4 + lenS + lenR;
     sig[2] = 0x02;
     sig[3] = lenR;
-    memcpy(sig+4, rp, lenR);
+    secp256k1_memcpy(sig+4, rp, lenR);
     sig[4+lenR] = 0x02;
     sig[5+lenR] = lenS;
-    memcpy(sig+lenR+6, sp, lenS);
+    secp256k1_memcpy(sig+lenR+6, sp, lenS);
     return 1;
 }
 

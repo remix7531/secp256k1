@@ -7,7 +7,6 @@
 #ifndef SECP256K1_GROUP_IMPL_H
 #define SECP256K1_GROUP_IMPL_H
 
-#include <string.h>
 
 #include "field.h"
 #include "group.h"
@@ -1037,7 +1036,7 @@ SECP256K1_INLINE static void secp256k1_ge_impl_to_bytes(unsigned char *buf, cons
      * sane compiler in the real world. */
     STATIC_ASSERT(sizeof(secp256k1_ge_storage) == 64);
     secp256k1_ge_to_storage(&s, a);
-    memcpy(buf, &s, 64);
+    secp256k1_memcpy(buf, &s, 64);
 }
 static void secp256k1_ge_to_bytes(unsigned char *buf, const secp256k1_ge *a) {
     SECP256K1_GE_VERIFY(a);
@@ -1048,7 +1047,7 @@ SECP256K1_INLINE static void secp256k1_ge_impl_from_bytes(secp256k1_ge *r, const
     secp256k1_ge_storage s;
 
     STATIC_ASSERT(sizeof(secp256k1_ge_storage) == 64);
-    memcpy(&s, buf, 64);
+    secp256k1_memcpy(&s, buf, 64);
     secp256k1_ge_from_storage(r, &s);
 }
 static void secp256k1_ge_from_bytes(secp256k1_ge *r, const unsigned char *buf) {
@@ -1058,7 +1057,7 @@ static void secp256k1_ge_from_bytes(secp256k1_ge *r, const unsigned char *buf) {
 
 SECP256K1_INLINE static void secp256k1_ge_impl_to_bytes_ext(unsigned char *data, const secp256k1_ge *ge) {
     if (ge->infinity) {
-        memset(data, 0, 64);
+        secp256k1_memset(data, 0, 64);
     } else {
         secp256k1_ge_to_bytes(data, ge);
     }
@@ -1167,7 +1166,7 @@ static void secp256k1_ge_serialize65(secp256k1_ge *elem, unsigned char *pub65) {
 
 SECP256K1_INLINE static void secp256k1_ge_impl_serialize_ext33(unsigned char *out33, secp256k1_ge *ge) {
     if (ge->infinity) {
-        memset(out33, 0, 33);
+        secp256k1_memset(out33, 0, 33);
     } else {
         /* Serialize must succeed because the point is not at infinity */
         secp256k1_ge_serialize33(ge, out33);

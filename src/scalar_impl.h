@@ -8,7 +8,6 @@
 #define SECP256K1_SCALAR_IMPL_H
 
 #ifdef VERIFY
-#include <string.h>
 #endif
 
 #include "scalar.h"

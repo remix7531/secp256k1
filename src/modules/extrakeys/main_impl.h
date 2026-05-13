@@ -32,7 +32,7 @@ int secp256k1_xonly_pubkey_parse(const secp256k1_context* ctx, secp256k1_xonly_p
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(pubkey != NULL);
-    memset(pubkey, 0, sizeof(*pubkey));
+    secp256k1_memset(pubkey, 0, sizeof(*pubkey));
     ARG_CHECK(input32 != NULL);
 
     if (!secp256k1_fe_set_b32_limit(&x, input32)) {
@@ -53,7 +53,7 @@ int secp256k1_xonly_pubkey_serialize(const secp256k1_context* ctx, unsigned char
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(output32 != NULL);
-    memset(output32, 0, 32);
+    secp256k1_memset(output32, 0, 32);
     ARG_CHECK(pubkey != NULL);
 
     if (!secp256k1_xonly_pubkey_load(ctx, &pk, pubkey)) {
@@ -83,7 +83,7 @@ int secp256k1_xonly_pubkey_cmp(const secp256k1_context* ctx, const secp256k1_xon
              * zero in that case, but it's not guaranteed by the API, we can't
              * test it and writing a VERIFY_CHECK is more complex than
              * explicitly memsetting (again). */
-            memset(out[i], 0, sizeof(out[i]));
+            secp256k1_memset(out[i], 0, sizeof(out[i]));
         }
     }
     return secp256k1_memcmp_var(out[0], out[1], sizeof(out[1]));
@@ -127,7 +127,7 @@ int secp256k1_xonly_pubkey_tweak_add(const secp256k1_context* ctx, secp256k1_pub
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(output_pubkey != NULL);
-    memset(output_pubkey, 0, sizeof(*output_pubkey));
+    secp256k1_memset(output_pubkey, 0, sizeof(*output_pubkey));
     ARG_CHECK(internal_pubkey != NULL);
     ARG_CHECK(tweak32 != NULL);
 
@@ -206,7 +206,7 @@ int secp256k1_keypair_create(const secp256k1_context* ctx, secp256k1_keypair *ke
     int ret = 0;
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(keypair != NULL);
-    memset(keypair, 0, sizeof(*keypair));
+    secp256k1_memset(keypair, 0, sizeof(*keypair));
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
     ARG_CHECK(seckey32 != NULL);
 
@@ -221,20 +221,20 @@ int secp256k1_keypair_create(const secp256k1_context* ctx, secp256k1_keypair *ke
 int secp256k1_keypair_sec(const secp256k1_context* ctx, unsigned char *seckey, const secp256k1_keypair *keypair) {
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(seckey != NULL);
-    memset(seckey, 0, 32);
+    secp256k1_memset(seckey, 0, 32);
     ARG_CHECK(keypair != NULL);
 
-    memcpy(seckey, &keypair->data[0], 32);
+    secp256k1_memcpy(seckey, &keypair->data[0], 32);
     return 1;
 }
 
 int secp256k1_keypair_pub(const secp256k1_context* ctx, secp256k1_pubkey *pubkey, const secp256k1_keypair *keypair) {
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(pubkey != NULL);
-    memset(pubkey, 0, sizeof(*pubkey));
+    secp256k1_memset(pubkey, 0, sizeof(*pubkey));
     ARG_CHECK(keypair != NULL);
 
-    memcpy(pubkey->data, &keypair->data[32], sizeof(*pubkey));
+    secp256k1_memcpy(pubkey->data, &keypair->data[32], sizeof(*pubkey));
     return 1;
 }
 
@@ -244,7 +244,7 @@ int secp256k1_keypair_xonly_pub(const secp256k1_context* ctx, secp256k1_xonly_pu
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(pubkey != NULL);
-    memset(pubkey, 0, sizeof(*pubkey));
+    secp256k1_memset(pubkey, 0, sizeof(*pubkey));
     ARG_CHECK(keypair != NULL);
 
     if (!secp256k1_keypair_load(ctx, NULL, &pk, keypair)) {
@@ -270,7 +270,7 @@ int secp256k1_keypair_xonly_tweak_add(const secp256k1_context* ctx, secp256k1_ke
     ARG_CHECK(tweak32 != NULL);
 
     ret = secp256k1_keypair_load(ctx, &sk, &pk, keypair);
-    memset(keypair, 0, sizeof(*keypair));
+    secp256k1_memset(keypair, 0, sizeof(*keypair));
 
     y_parity = secp256k1_extrakeys_ge_even_y(&pk);
     if (y_parity == 1) {
