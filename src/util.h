@@ -9,7 +9,11 @@
 
 #include "checkmem.h"
 
+#if !defined(SECP256K1_NO_LIBC)
+/* secp256k1_memcpy/memset/memmove forward to libc here. With SECP256K1_NO_LIBC
+ * they are self-contained byte loops and <string.h> is not needed. */
 #include <string.h>
+#endif
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -232,21 +236,71 @@ static SECP256K1_INLINE void secp256k1_memczero(void *s, size_t len, int flag) {
     }
 }
 
+/* The library calls these prefixed routines instead of the libc names (like
+ * secp256k1_memcmp_var). Normally they forward to libc. With SECP256K1_NO_LIBC
+ * defined they are pure-C byte loops needing no libc, and <string.h> is dropped
+ * (see the top of this header). The volatile destination in the no-libc loops
+ * keeps the compiler from turning them back into libc calls. */
+
 static SECP256K1_INLINE void *secp256k1_memcpy(void *dst, const void *src, size_t n) {
+#if defined(SECP256K1_NO_LIBC)
+    volatile unsigned char *d = (volatile unsigned char *)dst;
+    const unsigned char *s = (const unsigned char *)src;
+    size_t i;
+    for (i = 0; i < n; i++) {
+        d[i] = s[i];
+    }
+    return dst;
+#else
     return memcpy(dst, src, n);
+#endif
 }
 
 static SECP256K1_INLINE void *secp256k1_memset(void *dst, int c, size_t n) {
+#if defined(SECP256K1_NO_LIBC)
+    volatile unsigned char *d = (volatile unsigned char *)dst;
+    size_t i;
+    for (i = 0; i < n; i++) {
+        d[i] = (unsigned char)c;
+    }
+    return dst;
+#else
     return memset(dst, c, n);
+#endif
 }
 
 static SECP256K1_INLINE void *secp256k1_memmove(void *dst, const void *src, size_t n) {
+#if defined(SECP256K1_NO_LIBC)
+    volatile unsigned char *d = (volatile unsigned char *)dst;
+    const unsigned char *s = (const unsigned char *)src;
+    size_t i;
+    /* For any real memmove call dst and src point into one object, so the
+     * pointer comparison that selects the copy direction is well defined. */
+    if ((const unsigned char *)dst <= s) {
+        for (i = 0; i < n; i++) {
+            d[i] = s[i];
+        }
+    } else {
+        for (i = n; i > 0; i--) {
+            d[i - 1] = s[i - 1];
+        }
+    }
+    return dst;
+#else
     return memmove(dst, src, n);
+#endif
 }
 
 /* Zeroes memory to prevent leaking sensitive info. Won't be optimized out. */
 static SECP256K1_INLINE void secp256k1_memzero_explicit(void *ptr, size_t len) {
-#if defined(_MSC_VER)
+#if defined(SECP256K1_NO_LIBC)
+    /* Byte loop with a volatile destination so the clearing stores are kept. */
+    volatile unsigned char *p = (volatile unsigned char *)ptr;
+    size_t i;
+    for (i = 0; i < len; i++) {
+        p[i] = 0;
+    }
+#elif defined(_MSC_VER)
     /* SecureZeroMemory is guaranteed not to be optimized out by MSVC. */
     SecureZeroMemory(ptr, len);
 #elif defined(__GNUC__)
