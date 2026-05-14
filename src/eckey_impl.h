@@ -13,7 +13,6 @@
 #include "scalar.h"
 #include "field.h"
 #include "group.h"
-#include "ecmult_gen.h"
 
 static int secp256k1_eckey_seckey_tweak_add(secp256k1_scalar *key, const secp256k1_scalar *tweak) {
     secp256k1_scalar_add(key, key, tweak);
