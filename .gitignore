@@ -22,6 +22,8 @@ silentpayments_example
 *.sage.py
 
 Makefile
+# The formal-verification build has a hand-written, checked-in Makefile.
+!/proof/Makefile
 configure
 .libs/
 Makefile.in
