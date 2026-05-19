@@ -1,0 +1,19 @@
+# clightgen-generated Clight ASTs
+clight/*.v
+
+# rocq makefile + build artifacts
+Makefile.rocq
+Makefile.rocq.conf
+.Makefile.coq.d
+*.vo
+*.vok
+*.vos
+*.glob
+*.aux
+.*.aux
+.lia.cache
+.nia.cache
+.Makefile.rocq.d
+
+# axioms-target generated log (audit/check-axioms.sh input)
+audit/assumptions.log
