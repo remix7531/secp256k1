@@ -2,3 +2,17 @@
 -arg -w -arg -deprecated-from-Coq
 -arg -w -arg -deprecated-missing-stdlib
 clight/extraction.v
+theory/arithmetic.v
+theory/limb_window.v
+theory/bits.v
+theory/bytes.v
+theory/extra_math.v
+theory/field/field_bits.v
+theory/scalar/glv.v
+theory/primality/n.v
+model/constants.v
+model/types.v
+model/field.v
+model/int128.v
+model/acc.v
+model/scalar.v
