@@ -2,6 +2,10 @@
 -arg -w -arg -deprecated-from-Coq
 -arg -w -arg -deprecated-missing-stdlib
 clight/extraction.v
+vst/base.v
+vst/array_data_at.v
+vst/integers.v
+vst/composites.v
 theory/arithmetic.v
 theory/limb_window.v
 theory/bits.v
@@ -16,3 +20,18 @@ model/field.v
 model/int128.v
 model/acc.v
 model/scalar.v
+contract/field.v
+contract/gprog/field.v
+contract/gprog/int128.v
+contract/gprog/scalar.v
+contract/gprog/util.v
+contract/helper/notations.v
+contract/helper/repr.v
+contract/helper/structs_field.v
+contract/helper/structs_int128.v
+contract/helper/structs_scalar.v
+contract/impl/int128.v
+contract/impl/scalar.v
+contract/int128.v
+contract/scalar.v
+contract/util.v
