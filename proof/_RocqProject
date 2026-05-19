@@ -1,0 +1,4 @@
+-Q . secp256k1
+-arg -w -arg -deprecated-from-Coq
+-arg -w -arg -deprecated-missing-stdlib
+clight/extraction.v
