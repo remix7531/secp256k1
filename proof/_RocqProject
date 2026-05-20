@@ -35,3 +35,8 @@ contract/impl/scalar.v
 contract/int128.v
 contract/scalar.v
 contract/util.v
+tactics/core.v
+tactics/int128.v
+tactics/scalar.v
+tactics/field.v
+tactics/hygiene.v
