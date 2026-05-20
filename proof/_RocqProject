@@ -41,3 +41,4 @@ tactics/scalar.v
 tactics/field.v
 tactics/hygiene.v
 verif/util/read_be64.v
+verif/util/write_be64.v
