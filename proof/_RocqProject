@@ -43,6 +43,7 @@ tactics/hygiene.v
 verif/int128/impl/umul128.v
 verif/int128/u128_hi_u64.v
 verif/int128/u128_mul.v
+verif/int128/u128_to_u64.v
 verif/util/memclear_explicit.v
 verif/util/memzero_explicit.v
 verif/util/read_be64.v
