@@ -40,6 +40,7 @@ tactics/int128.v
 tactics/scalar.v
 tactics/field.v
 tactics/hygiene.v
+verif/int128/i128_mul.v
 verif/int128/impl/i128_dissip_mul.v
 verif/int128/impl/mul128.v
 verif/int128/impl/umul128.v
