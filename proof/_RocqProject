@@ -45,6 +45,7 @@ verif/int128/i128_det.v
 verif/int128/i128_from_i64.v
 verif/int128/i128_load.v
 verif/int128/i128_mul.v
+verif/int128/i128_rshift.v
 verif/int128/impl/i128_dissip_mul.v
 verif/int128/impl/mul128.v
 verif/int128/impl/umul128.v
