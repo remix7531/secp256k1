@@ -41,6 +41,7 @@ tactics/scalar.v
 tactics/field.v
 tactics/hygiene.v
 verif/int128/i128_accum_mul.v
+verif/int128/i128_check_pow2.v
 verif/int128/i128_det.v
 verif/int128/i128_eq_var.v
 verif/int128/i128_from_i64.v
