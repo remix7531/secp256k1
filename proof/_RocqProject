@@ -63,6 +63,7 @@ verif/int128/u128_mul.v
 verif/int128/u128_rshift.v
 verif/int128/u128_to_u64.v
 verif/scalar/impl/scalar_muladd.v
+verif/scalar/impl/scalar_muladd_fast.v
 verif/util/memclear_explicit.v
 verif/util/memzero_explicit.v
 verif/util/read_be64.v
