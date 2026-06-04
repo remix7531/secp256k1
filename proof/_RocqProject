@@ -64,6 +64,7 @@ verif/int128/u128_rshift.v
 verif/int128/u128_to_u64.v
 verif/scalar/impl/scalar_extract.v
 verif/scalar/impl/scalar_extract_fast.v
+verif/scalar/impl/scalar_mul_512.v
 verif/scalar/impl/scalar_muladd.v
 verif/scalar/impl/scalar_muladd_fast.v
 verif/scalar/impl/scalar_sumadd.v
