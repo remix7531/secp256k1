@@ -67,6 +67,7 @@ verif/scalar/impl/scalar_extract_fast.v
 verif/scalar/impl/scalar_mul_512.v
 verif/scalar/impl/scalar_muladd.v
 verif/scalar/impl/scalar_muladd_fast.v
+verif/scalar/impl/scalar_reduce_512.v
 verif/scalar/impl/scalar_sumadd.v
 verif/scalar/impl/scalar_sumadd_fast.v
 verif/util/memclear_explicit.v
