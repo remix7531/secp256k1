@@ -74,6 +74,7 @@ verif/scalar/impl/scalar_shift_limb.v
 verif/scalar/impl/scalar_sumadd.v
 verif/scalar/impl/scalar_sumadd_fast.v
 verif/scalar/scalar_add.v
+verif/scalar/scalar_cadd_bit.v
 verif/scalar/scalar_cmov.v
 verif/scalar/scalar_half.v
 verif/scalar/scalar_mul.v
