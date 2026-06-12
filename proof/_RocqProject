@@ -79,6 +79,7 @@ verif/scalar/scalar_clear.v
 verif/scalar/scalar_cmov.v
 verif/scalar/scalar_cond_negate.v
 verif/scalar/scalar_eq.v
+verif/scalar/scalar_get_b32.v
 verif/scalar/scalar_half.v
 verif/scalar/scalar_mul.v
 verif/scalar/scalar_negate.v
