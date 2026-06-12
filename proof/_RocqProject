@@ -84,6 +84,7 @@ verif/scalar/scalar_half.v
 verif/scalar/scalar_mul.v
 verif/scalar/scalar_negate.v
 verif/scalar/scalar_set_b32.v
+verif/scalar/scalar_set_b32_seckey.v
 verif/util/memclear_explicit.v
 verif/util/memzero_explicit.v
 verif/util/read_be64.v
