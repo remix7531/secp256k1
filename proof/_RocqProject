@@ -83,6 +83,7 @@ verif/scalar/scalar_get_b32.v
 verif/scalar/scalar_half.v
 verif/scalar/scalar_is_even.v
 verif/scalar/scalar_is_high.v
+verif/scalar/scalar_is_one.v
 verif/scalar/scalar_mul.v
 verif/scalar/scalar_negate.v
 verif/scalar/scalar_set_b32.v
