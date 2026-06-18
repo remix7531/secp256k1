@@ -94,6 +94,7 @@ verif/scalar/scalar_set_b32.v
 verif/scalar/scalar_set_b32_seckey.v
 verif/scalar/scalar_set_int.v
 verif/scalar/scalar_split_128.v
+verif/scalar/scalar_split_lambda.v
 verif/scalar/scalar_verify.v
 verif/util/memclear_explicit.v
 verif/util/memzero_explicit.v
