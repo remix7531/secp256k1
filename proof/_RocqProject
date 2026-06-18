@@ -88,6 +88,7 @@ verif/scalar/scalar_is_high.v
 verif/scalar/scalar_is_one.v
 verif/scalar/scalar_is_zero.v
 verif/scalar/scalar_mul.v
+verif/scalar/scalar_mul_shift_var.v
 verif/scalar/scalar_negate.v
 verif/scalar/scalar_set_b32.v
 verif/scalar/scalar_set_b32_seckey.v
