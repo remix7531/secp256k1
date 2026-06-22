@@ -7,17 +7,21 @@
     accumulator primitives ([muladd] / [sumadd] / [extract], with their [_fast]
     variants), the overflow-check + reduction pipeline ([check_overflow],
     [reduce], [mul_512], [reduce_512]), the rounded-shift limb helper
-    ([shift_limb]).  The public scalar API is specified in
-    [contract/scalar.v].  The proving [Gprog]s composing public and internal
-    specifications live in [contract/gprog/scalar.v]. *)
+    ([shift_limb]), and the scalar <-> signed62 bridge ([to_signed62] /
+    [from_signed62]).  The public scalar API (including [secp256k1_scalar_mul],
+    [inverse], [inverse_var]) is specified in [contract/scalar.v]; the proving
+    [Gprog]s composing public + internal live in [contract/gprog/scalar.v] (and, for
+    the inverse-bridge call graph, [contract/modinv.v]). *)
 
 Require Import secp256k1.vst.base.
 Require Import secp256k1.contract.helper.structs_scalar.
+Require Import secp256k1.contract.helper.structs_modinv.
 Require Import secp256k1.theory.arithmetic.
 Require Import secp256k1.theory.bytes.
 Require Import secp256k1.model.int128.
 Require Import secp256k1.model.acc.
 Require Import secp256k1.model.scalar.
+Require Import secp256k1.contract.helper.signed62.
 Require Import secp256k1.contract.helper.notations.
 
 (* ================================================================= *)
@@ -238,3 +242,47 @@ Definition spec_secp256k1_scalar_shift_limb : ident * funspec :=
     PROP ()
     RETURN (Vlong (Int64.repr (limb (2 ^ 64) (u512_val l / 2 ^ shift) (Z.to_nat j))))
     SEP (u512_at sh l_ptr l).
+
+(* ================================================================= *)
+(** ** Scalar <-> signed62 bridge -- [to_signed62] / [from_signed62]. *)
+
+(** These reference the [Signed62] representation ([contract/helper/signed62.v]); they
+    are internal helpers for the modular inverse path. *)
+
+(** [secp256k1_scalar_to_signed62]: repack the 4-limb scalar [*a] into the
+    5-limb signed62 form [*r] (little-endian 62-bit limbs).  The value is
+    unchanged, so [r] is the canonical [reprn 5 (scalar_val a)]. *)
+Definition spec_secp256k1_scalar_to_signed62 : ident * funspec :=
+  DECLARE _secp256k1_scalar_to_signed62
+  WITH r_ptr : val, a_ptr : val, a : Scalar, sh_r : share, sh_a : share
+  PRE [ tptr t_secp256k1_modinv64_signed62, tptr t_secp256k1_scalar ]
+    PROP (writable_share sh_r;
+          readable_share sh_a)
+    PARAMS (r_ptr; a_ptr)
+    SEP (data_at_ sh_r t_secp256k1_modinv64_signed62 r_ptr;
+         scalar_at sh_a a_ptr a)
+  POST [ tvoid ]
+    PROP ()
+    RETURN ()
+    SEP (signed62_at sh_r r_ptr (scalar_val a);
+         scalar_at sh_a a_ptr a).
+
+(** [secp256k1_scalar_from_signed62]: repack a normalized 5-limb signed62
+    number [*a] (value [x] in [[0, N)]) back into the 4-limb scalar [*r].
+    The result scalar holds exactly [x]. *)
+Definition spec_secp256k1_scalar_from_signed62 : ident * funspec :=
+  DECLARE _secp256k1_scalar_from_signed62
+  WITH r_ptr : val, a_ptr : val, x : Z, sh_r : share, sh_a : share
+  PRE [ tptr t_secp256k1_scalar, tptr t_secp256k1_modinv64_signed62 ]
+    PROP (writable_share sh_r;
+          readable_share sh_a;
+          (0 <= x < secp256k1_N)%Z)
+    PARAMS (r_ptr; a_ptr)
+    SEP (data_at_ sh_r t_secp256k1_scalar r_ptr;
+         signed62_at sh_a a_ptr x)
+  POST [ tvoid ]
+    EX r : Scalar,
+    PROP ((scalar_val r = x)%Z)
+    RETURN ()
+    SEP (scalar_at sh_r r_ptr r;
+         signed62_at sh_a a_ptr x).
