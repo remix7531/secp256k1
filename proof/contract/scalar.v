@@ -2,18 +2,23 @@
 (** Copyright (C) 2026 remix7531
     SPDX-License-Identifier: MIT *)
 
-(** Specifies the public scalar arithmetic API in [src/scalar.h].  The
-    static accumulator primitives, reduction pipeline, and shifted limb
-    helper in [src/scalar_4x64_impl.h] are specified in
+(** Mirrors the public [src/scalar.h] surface: [secp256k1_scalar_mul] and the
+    rest of the exported API, including the modular inverse entry points
+    [secp256k1_scalar_inverse] / [_var].  The [static] helpers declared only in
+    [src/scalar_4x64_impl.h] (the accumulator primitives, the reduction
+    pipeline, [shift_limb], and the scalar <-> signed62 bridge) are specified in
     [contract/impl/scalar.v]. *)
 
 Require Import secp256k1.vst.base.
 Require Import secp256k1.contract.helper.structs_scalar.
+Require Import secp256k1.contract.helper.structs_modinv.
 Require Import secp256k1.theory.arithmetic.
 Require Import secp256k1.theory.bytes.
 Require Import Coq.ZArith.Znumtheory.
 Require Import secp256k1.model.int128.
 Require Import secp256k1.model.scalar.
+Require Import secp256k1.model.modinv.
+Require Import secp256k1.contract.helper.signed62.
 Require Import secp256k1.contract.util.
 Require Import secp256k1.contract.helper.notations.
 
@@ -495,3 +500,68 @@ Definition spec_secp256k1_scalar_split_lambda : ident * funspec :=
          u256_at sh_tab (gv _minus_b2) c_minus_b2;
          u256_at sh_tab (gv _g1) c_g1;
          u256_at sh_tab (gv _g2) c_g2).
+
+(* ================================================================= *)
+(** ** Modular inverse -- [secp256k1_scalar_inverse] / [_var]. *)
+
+(** Public scalar API ([src/scalar.h]).  Both reference the [Signed62] /
+    [make_modinfo] glue ([contract/helper/signed62.v]) and the constant
+    [secp256k1_const_modinfo_scalar] holding [make_modinfo N]; the bodies are
+    proved (in [verif/scalar/scalar_inverse{,_var}.v]) against the modinv call
+    graph via [to_signed62] + the safegcd driver + [from_signed62].  The POSTs
+    state the model spec [is_modular_inverse (scalar_val x) N (scalar_val r)]
+    ([r] reduced; [x = 0 -> r = 0]; [rel_prime x N -> x*r = 1 mod N]); there is
+    NO coprimality precondition -- [N] is prime
+    ([model.constants.secp256k1_N_prime]), so every scalar is invertible (or 0). *)
+
+(** [secp256k1_scalar_inverse_var]: set [*r] to the modular inverse of [*x]
+    (variable-time, reads the de Bruijn table): the result [r] satisfies
+    [(scalar_val x * scalar_val r) mod N = 1] when [x <> 0] (and [r = 0] when
+    [x = 0]).  Non-aliasing ([r] and [x] distinct). *)
+Definition spec_secp256k1_scalar_inverse_var : ident * funspec :=
+  DECLARE _secp256k1_scalar_inverse_var
+  WITH r_ptr : val, x_ptr : val, x : Scalar, gv : globals,
+       sh_r : share, sh_x : share, sh_modinfo : share, sh_debruijn : share
+  PRE [ tptr t_secp256k1_scalar, tptr t_secp256k1_scalar ]
+    PROP (writable_share sh_r;
+          readable_share sh_x;
+          readable_share sh_modinfo;
+          readable_share sh_debruijn)
+    PARAMS (r_ptr; x_ptr)
+    GLOBALS (gv)
+    SEP (data_at_ sh_r t_secp256k1_scalar r_ptr;
+         scalar_at sh_x x_ptr x;
+         modinfo_at sh_modinfo (gv _secp256k1_const_modinfo_scalar) secp256k1_N;
+         debruijn64_array sh_debruijn gv)
+  POST [ tvoid ]
+    EX r : Scalar,
+    PROP (is_modular_inverse (scalar_val x) secp256k1_N (scalar_val r))
+    RETURN ()
+    SEP (scalar_at sh_r r_ptr r;
+         scalar_at sh_x x_ptr x;
+         modinfo_at sh_modinfo (gv _secp256k1_const_modinfo_scalar) secp256k1_N;
+         debruijn64_array sh_debruijn gv).
+
+(** [secp256k1_scalar_inverse]: constant-time scalar modular inverse.  Same
+    property POST as [..._inverse_var] but through the constant-time driver, so
+    the spec drops the debruijn-table SEP.  Non-aliasing. *)
+Definition spec_secp256k1_scalar_inverse : ident * funspec :=
+  DECLARE _secp256k1_scalar_inverse
+  WITH r_ptr : val, x_ptr : val, x : Scalar, gv : globals,
+       sh_r : share, sh_x : share, sh_modinfo : share
+  PRE [ tptr t_secp256k1_scalar, tptr t_secp256k1_scalar ]
+    PROP (writable_share sh_r;
+          readable_share sh_x;
+          readable_share sh_modinfo)
+    PARAMS (r_ptr; x_ptr)
+    GLOBALS (gv)
+    SEP (data_at_ sh_r t_secp256k1_scalar r_ptr;
+         scalar_at sh_x x_ptr x;
+         modinfo_at sh_modinfo (gv _secp256k1_const_modinfo_scalar) secp256k1_N)
+  POST [ tvoid ]
+    EX r : Scalar,
+    PROP (is_modular_inverse (scalar_val x) secp256k1_N (scalar_val r))
+    RETURN ()
+    SEP (scalar_at sh_r r_ptr r;
+         scalar_at sh_x x_ptr x;
+         modinfo_at sh_modinfo (gv _secp256k1_const_modinfo_scalar) secp256k1_N).
