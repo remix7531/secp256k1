@@ -93,6 +93,7 @@ verif/int128/u128_load.v
 verif/int128/u128_mul.v
 verif/int128/u128_rshift.v
 verif/int128/u128_to_u64.v
+verif/modinv/impl/modinv64_divsteps_62_var.v
 verif/modinv/impl/modinv64_normalize_62.v
 verif/modinv/impl/modinv64_signed62_assign.v
 verif/scalar/get_bits_limb32.v
