@@ -102,6 +102,7 @@ verif/modinv/impl/modinv64_update_de_limb.v
 verif/modinv/impl/modinv64_update_fg_62.v
 verif/modinv/impl/modinv64_update_fg_62_var.v
 verif/modinv/modinv64.v
+verif/modinv/modinv64_var.v
 verif/scalar/get_bits_limb32.v
 verif/scalar/get_bits_var.v
 verif/scalar/impl/scalar_check_overflow.v
