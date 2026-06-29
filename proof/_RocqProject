@@ -126,6 +126,7 @@ verif/scalar/scalar_cond_negate.v
 verif/scalar/scalar_eq.v
 verif/scalar/scalar_get_b32.v
 verif/scalar/scalar_half.v
+verif/scalar/scalar_inverse.v
 verif/scalar/scalar_is_even.v
 verif/scalar/scalar_is_high.v
 verif/scalar/scalar_is_one.v
