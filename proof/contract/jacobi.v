@@ -9,9 +9,8 @@
     The function computes the Jacobi symbol [(x | m)] of a coprime input in
     variable time via the safegcd posdivsteps; being "maybe", it may return [0]
     ("unknown") if it does not converge within its iteration cap.  The model is
-    [model.modinv.jacobi_symbol].  NOTE: the body proof is left [Admitted] (see
-    [verif/modinv/jacobi64_maybe_var.v]) -- an explicit outstanding gap, NOT a
-    trusted axiom, and deliberately NOT part of the audited [verified_surface]. *)
+    [model.modinv.jacobi_symbol].  No body proof is included, and the function
+    is deliberately not part of the audited [verified_surface]. *)
 
 Require Import VST.floyd.proofauto.
 Require Import secp256k1.vst.base.

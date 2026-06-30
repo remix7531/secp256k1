@@ -1,19 +1,41 @@
+# IMPORTANT: keep the -Q / -arg directives below contiguous at the TOP, before
+# any '#' comment.  coq-lsp stops collecting flags at the first comment, so a
+# comment between directives makes the editor drop every later directive (make
+# and clightgen read the whole file regardless).  One flat `secp256k1` namespace.
 -Q . secp256k1
 -arg -w -arg -deprecated-from-Coq
 -arg -w -arg -deprecated-missing-stdlib
+
+# The extraction AST (clightgen output, git-ignored).
 clight/extraction.v
+
+# vst/ -- VST/CompCert glue over the AST: floyd re-export + CompSpecs/Vprog,
+#   generic separation-logic helpers.  Toolchain glue only, zero trusted content.
 vst/base.v
 vst/array_data_at.v
 vst/integers.v
 vst/composites.v
+
+# theory/ -- generic Z / limb / bit math (VST-free), per-subsystem subdirs.
+#   Generic core at the root; extra_math.v is frozen vendored MIT.
 theory/arithmetic.v
 theory/limb_window.v
 theory/bits.v
 theory/bytes.v
 theory/extra_math.v
 theory/modinv/bounds.v
+
+# theory/hash/ -- hash-subsystem math (32-bit word bit ops for SHA-256).
+
+# theory/field/ -- field-subsystem math.
 theory/field/field_bits.v
+
+# theory/scalar/ -- scalar-subsystem math.
 theory/scalar/glv.v
+
+# theory/modinv/ -- the safegcd umbrella.
+#   construction/ is the gcd/divstep construction (MIT-ported from simplicity);
+#   divsteps/ is the vendored safegcd-bounds convergence library (MIT).
 theory/modinv/construction/bezout.v
 theory/modinv/construction/inverse.v
 theory/modinv/construction/divstep.v
@@ -32,7 +54,12 @@ theory/modinv/divsteps/orient.v
 theory/modinv/divsteps/qq.v
 theory/modinv/divsteps/sound.v
 theory/modinv/divsteps/theory.v
+
+# theory/primality/ -- a coqprime Pocklington certificate for the group
+#   order, additive to model/constants.v's Axiom (see secp256k1_fv.v).
 theory/primality/n.v
+
+# model/ -- the pure functional spec (the trust boundary).
 model/constants.v
 model/types.v
 model/field.v
@@ -42,6 +69,9 @@ model/modinv.v
 model/jacobi_rules.v
 model/scalar.v
 model/tests.v
+
+# contract/ -- representation predicates, funspecs, and the global Gprog.
+#   modinv contracts + helper/signed62 are vendored from simplicity (MIT).
 contract/field.v
 contract/gprog/all.v
 contract/gprog/field.v
@@ -65,11 +95,16 @@ contract/jacobi.v
 contract/modinv.v
 contract/scalar.v
 contract/util.v
+
+# tactics/ -- proof automation: generic core + one file per subsystem.
+#   modinv.v is the vendored MIT progressC port.
 tactics/core.v
 tactics/int128.v
 tactics/scalar.v
 tactics/field.v
 tactics/hygiene.v
+
+# verif/ -- body proofs for the verified surface.
 verif/field/fe_add.v
 verif/int128/i128_accum_mul.v
 verif/int128/i128_check_pow2.v
@@ -147,3 +182,6 @@ verif/util/memclear_explicit.v
 verif/util/memzero_explicit.v
 verif/util/read_be64.v
 verif/util/write_be64.v
+
+# secp256k1_fv.v -- the reviewer-facing headline (audit/statement.v pins it).
+secp256k1_fv.v
