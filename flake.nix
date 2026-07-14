@@ -9,9 +9,11 @@
       flake = false;
     };
 
+    rocq-mcp.url = "github:remix7531/rocq-mcp/66c107a8068af1b3828e131657f6c706b7293805";
+    rocq-mcp.inputs.flake-utils.follows = "flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils, flake-compat, ... }:
+  outputs = { self, nixpkgs, flake-utils, flake-compat, rocq-mcp, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -54,7 +56,9 @@
             pkg-config
             vampire
             which
-          ]);
+          ]) ++ [
+            rocq-mcp.packages.${system}.rocq-mcp
+          ];
         };
       });
 }

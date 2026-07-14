@@ -50,11 +50,77 @@
         "type": "github"
       }
     },
+    "nixpkgs_2": {
+      "locked": {
+        "lastModified": 1781074563,
+        "narHash": "sha256-md8WlXOlfnIeHeOScMTTHFyf2d6iaTwPl2apR5EQ3P4=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "9ae611a455b90cf061d8f332b977e387bda8e1ca",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "pytanque": {
+      "inputs": {
+        "flake-utils": [
+          "rocq-mcp",
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "rocq-mcp",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1779018200,
+        "narHash": "sha256-o28Z7p2A2ocSdJawML8Qe19JTRkKNLV9T5Utgs8QIC0=",
+        "owner": "remix7531",
+        "repo": "pytanque",
+        "rev": "77763f3d99c6cc2eccab3e35518d6a7a3be5e2c1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "remix7531",
+        "ref": "feat/nix-flake",
+        "repo": "pytanque",
+        "type": "github"
+      }
+    },
+    "rocq-mcp": {
+      "inputs": {
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nixpkgs": "nixpkgs_2",
+        "pytanque": "pytanque"
+      },
+      "locked": {
+        "lastModified": 1781619274,
+        "narHash": "sha256-cgpznR9w8j9n5n9bFH6FLpkCpvvf3qyFn6dp4ALKnU4=",
+        "owner": "remix7531",
+        "repo": "rocq-mcp",
+        "rev": "66c107a8068af1b3828e131657f6c706b7293805",
+        "type": "github"
+      },
+      "original": {
+        "owner": "remix7531",
+        "repo": "rocq-mcp",
+        "rev": "66c107a8068af1b3828e131657f6c706b7293805",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "flake-compat": "flake-compat",
         "flake-utils": "flake-utils",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "rocq-mcp": "rocq-mcp"
       }
     },
     "systems": {
