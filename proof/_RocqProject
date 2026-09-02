@@ -26,6 +26,7 @@ theory/extra_math.v
 theory/modinv/bounds.v
 
 # theory/hash/ -- hash-subsystem math (32-bit word bit ops for SHA-256).
+theory/hash/sha256_bits.v
 
 # theory/field/ -- field-subsystem math.
 theory/field/field_bits.v
@@ -58,6 +59,7 @@ theory/modinv/divsteps/theory.v
 # theory/primality/ -- a coqprime Pocklington certificate for the group
 #   order, additive to model/constants.v's Axiom (see secp256k1_fv.v).
 theory/primality/n.v
+theory/primality/p.v
 
 # model/ -- the pure functional spec (the trust boundary).
 model/constants.v
@@ -68,7 +70,10 @@ model/acc.v
 model/modinv.v
 model/jacobi_rules.v
 model/scalar.v
+model/hash.v
 model/tests.v
+model/tests_hash.v
+model/tests_field.v
 
 # contract/ -- representation predicates, funspecs, and the global Gprog.
 #   modinv contracts + helper/signed62 are vendored from simplicity (MIT).

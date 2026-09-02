@@ -102,3 +102,157 @@ Proof.
     | assert (E : (2:Z) ^ 48 = 281474976710656) by reflexivity ];
     rewrite E in Hlr1, Hla1; lia.
 Qed.
+
+(* ================================================================= *)
+(** ** Multiplication / squaring bound -- [fe_mul_limb_no_overflow].
+
+    [secp256k1_fe_mul_inner] / [secp256k1_fe_sqr_inner] (the u128-accumulator
+    driver behind [fe_mul] / [fe_sqr]) require both inputs' magnitude to be at
+    most 8; every partial product it accumulates is one pair of magnitude-8
+    limbs.  This is the per-pair no-overflow fact the accumulator bound proof
+    needs at every step, mirroring [fe_add_limb_no_overflow] above. *)
+
+(** Every [fe_limb_mag_bound m i] is at most the (larger) limb-0..3 form
+    [2*m*(2^52-1)], regardless of [i] -- the limb-4 form is strictly smaller. *)
+Lemma fe_limb_mag_bound_le52 : forall m i,
+  0 <= m -> fe_limb_mag_bound m i <= 2 * m * (2 ^ 52 - 1).
+Proof.
+  intros m i Hm.
+  unfold fe_limb_mag_bound.
+  destruct (i <? 4)%nat; [lia|].
+  assert (H48 : (2:Z) ^ 48 <= 2 ^ 52) by (apply Z.pow_le_mono_r; lia).
+  nia.
+Qed.
+
+(** Two magnitude-8 limbs multiply to well under [2^128]: the concrete bound
+    a [u128] accumulator needs. *)
+Lemma fe_mul_limb_no_overflow : forall (i j : nat) (li lj : Z),
+  0 <= li <= fe_limb_mag_bound 8 i ->
+  0 <= lj <= fe_limb_mag_bound 8 j ->
+  0 <= li * lj < 2 ^ 128.
+Proof.
+  intros i j li lj [Hli0 Hli1] [Hlj0 Hlj1].
+  pose proof (fe_limb_mag_bound_le52 8 i ltac:(lia)) as Hi.
+  pose proof (fe_limb_mag_bound_le52 8 j ltac:(lia)) as Hj.
+  assert (Hc : 2 * 8 * (2 ^ 52 - 1) = 72057594037927920) by reflexivity.
+  assert (H128 : (2:Z) ^ 128 = 340282366920938463463374607431768211456) by reflexivity.
+  nia.
+Qed.
+
+(* ================================================================= *)
+(** ** Normalized-form bound -- [fe_limb_norm_bound] ties [normalize]'s output
+    to the [fe_limb_mag_bound] family it starts from. *)
+
+(** The per-limb cap [secp256k1_fe_impl_normalize] leaves once carry
+    propagation is complete (the C's own "Normalized requires: n\[i\] <=
+    (2^52 - 1)..." comment): limbs 0..3 fit 52 bits, limb 4 fits 48. *)
+Definition fe_limb_norm_bound (i : nat) : Z :=
+  if (i <? 4)%nat then 2 ^ 52 - 1 else 2 ^ 48 - 1.
+
+(** Magnitude 1 is exactly twice the normalized bound, per limb -- the
+    identity that lets a magnitude-1 bound bridge to a normalized one (and
+    vice versa) without a separate proof for each limb index. *)
+Lemma fe_limb_norm_bound_half_mag1 : forall i,
+  2 * fe_limb_norm_bound i = fe_limb_mag_bound 1 i.
+Proof.
+  intros i.
+  unfold fe_limb_norm_bound, fe_limb_mag_bound.
+  destruct (i <? 4)%nat; lia.
+Qed.
+
+(* ================================================================= *)
+(** ** Fast modular exponentiation -- [pow_mod] / [pow_mod_pos].
+
+    [secp256k1_fe_sqrt]'s addition-chain power is [fe_pow a ((p+1)/4)], a
+    ~254-bit exponent: naive [a ^ e mod p] via [Z.pow] builds the whole
+    unreduced power before ever taking a remainder (astronomically large).
+    Square-and-multiply, recursing on the exponent's binary ([positive])
+    representation and reducing mod [m] at every step, is what keeps
+    [fe_pow] (and hence [fe_inv] / [fe_sqrt]) [vm_compute]-fast, matching the
+    KAT stage's needs (see [model.field]). *)
+
+(** One [pow_mod] step per bit of the exponent, most-significant first. *)
+Fixpoint pow_mod_pos (a : Z) (e : positive) (m : Z) : Z :=
+  match e with
+  | xH => a mod m
+  | xO e' => let h := pow_mod_pos a e' m in (h * h) mod m
+  | xI e' => let h := pow_mod_pos a e' m in (h * h * a) mod m
+  end.
+
+(** [a ^ e mod m] for any [e : Z].  A negative [e] is unused by the field
+    model ([fe_pow] is only ever applied to a nonnegative exponent) and maps
+    to [0], which keeps [pow_mod] total and its range lemma unconditional. *)
+Definition pow_mod (a e m : Z) : Z :=
+  match e with
+  | Z0 => 1 mod m
+  | Zpos p => pow_mod_pos a p m
+  | Zneg _ => 0
+  end.
+
+(** [pow_mod_pos] stays inside [[0, m)] for a positive modulus. *)
+Lemma pow_mod_pos_range : forall a e m, 0 < m -> 0 <= pow_mod_pos a e m < m.
+Proof.
+  intros a e m Hm.
+  induction e as [e' _|e' _|]; simpl; apply Z.mod_pos_bound; lia.
+Qed.
+
+(** [pow_mod] stays inside [[0, m)] for any exponent and a positive modulus --
+    the range fact [fe_pow]'s [Program Definition] obligation needs. *)
+Lemma pow_mod_range : forall a e m, 0 < m -> 0 <= pow_mod a e m < m.
+Proof.
+  intros a e m Hm.
+  destruct e as [|p|p]; simpl.
+  - apply Z.mod_pos_bound; lia.
+  - apply pow_mod_pos_range; lia.
+  - lia.
+Qed.
+
+(** Congruence helper: replacing two "mod [n]"-reduced factors of a triple
+    product by their un-reduced values does not change the product mod [n].
+    The [pow_mod_pos_spec] [xI] case needs exactly this shape. *)
+Lemma pow_mod_sqr_mul_cong : forall x y n,
+  (x mod n) * (x mod n) * y mod n = x * x * y mod n.
+Proof.
+  intros x y n.
+  rewrite (Zmult_mod (x * x) y n).
+  rewrite (Zmult_mod x x n).
+  rewrite Zmult_mod_idemp_l.
+  rewrite Zmult_mod_idemp_r.
+  reflexivity.
+Qed.
+
+(** [pow_mod_pos] really is square-and-multiply exponentiation: it agrees
+    with plain [Z.pow] followed by one final [mod].  Downstream correctness
+    proofs for [fe_pow] (Fermat's little theorem for [fe_inv], the
+    [(p+1)/4]-power formula for [fe_sqrt]) go through this, not through
+    [pow_mod_pos]'s recursion directly. *)
+Lemma pow_mod_pos_spec : forall a e m,
+  pow_mod_pos a e m = a ^ (Z.pos e) mod m.
+Proof.
+  intros a e m.
+  induction e as [e' IH|e' IH|].
+  - (* e = xI e' : odd exponent, one extra factor of [a].  [cbn] is scoped to
+       [pow_mod_pos] alone -- a bare [simpl] also unfolds [Z.pow] on the RHS
+       (into [Z.pow_pos], dropping the [Z.pos] wrapper [Pos2Z.inj_xI] needs)
+       before the rewrites below get a chance to fire on it. *)
+    cbn [pow_mod_pos].
+    rewrite IH.
+    rewrite Pos2Z.inj_xI.
+    replace (2 * Z.pos e' + 1) with (Z.pos e' + Z.pos e' + 1) by lia.
+    rewrite (Z.pow_add_r a (Z.pos e' + Z.pos e') 1) by lia.
+    rewrite (Z.pow_add_r a (Z.pos e') (Z.pos e')) by lia.
+    rewrite Z.pow_1_r.
+    apply pow_mod_sqr_mul_cong.
+  - (* e = xO e' : even exponent, a plain square *)
+    cbn [pow_mod_pos].
+    rewrite IH.
+    rewrite Pos2Z.inj_xO.
+    replace (2 * Z.pos e') with (Z.pos e' + Z.pos e') by lia.
+    rewrite (Z.pow_add_r a (Z.pos e') (Z.pos e')) by lia.
+    symmetry.
+    apply Zmult_mod.
+  - (* e = xH : base case *)
+    cbn [pow_mod_pos].
+    rewrite Z.pow_1_r.
+    reflexivity.
+Qed.
