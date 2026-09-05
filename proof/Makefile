@@ -9,6 +9,9 @@
 #                        int128, util, scalar, field, modinv.
 #   make timing       : TIMED build + a slowest-files table; add BASELINE=1
 #                        to (re)write audit/timing-baseline.txt.
+#   make model-tests  : compile each model/tests_slow_*.v in sequence (10-50
+#                        MINUTES EACH) -- the slow curve KATs excluded from
+#                        _RocqProject; not part of `proof` or `audit`.
 #
 # Run inside the dev shell from the repo-root flake (`nix develop` or direnv).
 
@@ -65,7 +68,7 @@ SUBMAKE = $(MAKE)
 # anything here: it never corresponds to a real file, so make always treats
 # it as out of date and reruns the recipe -- the same practical behaviour
 # .PHONY exists to give, just not spelled that way.
-.PHONY: all extract proof clean axioms audit style timing
+.PHONY: all extract proof clean axioms audit style timing model-tests
 
 all: proof
 
@@ -155,6 +158,23 @@ audit: proof
 # `make style` is a pure grep gate: no build prerequisite.
 style:
 	@bash audit/check.sh 5
+
+# ---- Slow model KAT tests (opt-in, NOT part of `proof` or `audit`) ---------
+# model/tests_slow_*.v run the same known-answer tests as their ordinary
+# counterparts but at a scale (full ecmult/ecmult_gen table geometry) that
+# costs 10 TO 50 MINUTES EACH under vm_compute -- far too slow to sit in
+# `_RocqProject`, so they are excluded from it (audit/check.sh gate 0 exempts
+# them the same way it exempts audit/assumptions.v) and only ever built here,
+# one at a time, on request. Depends on `proof` so every dependency's .vo is
+# current; reuses ROCQ_FLAGS so the load-path flags never drift from
+# _RocqProject.
+MODEL_SLOW_V := $(wildcard model/tests_slow_*.v)
+
+model-tests: proof
+	@for f in $(MODEL_SLOW_V); do \
+	  echo "compiling $$f (10-50 min) ..."; \
+	  rocq compile $(ROCQ_FLAGS) $$f || exit 1; \
+	done
 
 clean:
 	@if [ -e Makefile.rocq ]; then $(MAKE) --no-print-directory -f Makefile.rocq cleanall 2>/dev/null; fi

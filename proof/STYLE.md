@@ -450,20 +450,43 @@ wholesale drop has a home decided in advance.
 `audit/check.sh` is the mechanical honesty gate, seven checks:
 
 0. Build freshness -- every file listed in `_RocqProject` has an up-to-date
-   `.vo`.
+   `.vo`. `model/tests_slow_*.v` are exempted from the "every layer `.v` is
+   tracked in `_RocqProject`" half of this check, the same way
+   `audit/assumptions.v` is: they are the slow curve KATs, deliberately kept
+   out of `_RocqProject` because each one costs 10 to 50 minutes under
+   `vm_compute` (built on request via `make model-tests`, never by `make
+   proof` / `make audit`). The gate's OK/FAIL line reports how many files
+   that exemption covered.
 0b. AST fingerprint -- `clight/extraction.v` matches the pinned
     `audit/extraction.sha256`, so a silent re-extraction cannot swap the AST
     the proofs are checked against.
 1. Proof gaps -- no `Admitted.` / `admit.` / `give_up.` anywhere under
-   `proof/` (`audit/` holds queries, not proofs).
+   `proof/` except the register of scaffolded
+   `model/` lemmas in `audit/scaffold.txt` (one `path:lemma` per line). The
+   gate is a two-way match: every `Admitted.` site outside the sanctioned
+   carve-out must have a `scaffold.txt` line naming its file and its nearest
+   preceding `Lemma`/`Theorem`/`Corollary`, and every `scaffold.txt` line must
+   name a real `Admitted.` site -- a stale entry (one whose lemma has since
+   been proved or renamed) fails the gate exactly like an unregistered gap
+   does. `scaffold.txt`'s first line may be a `# count: N` ratchet comment;
+   when present it must equal the file's actual entry count. The gate prints
+   the registered count per file.
 2. Axiom confinement -- every top-level `Axiom`, `Parameter`, and section
    `Hypothesis` under `proof/` is confined to the files on the gate's
    explicit allowlist; today that is
    `theory/modinv/divsteps/{bound724,bound590}.v` (`example724` /
-   `example590`) -- see `audit/AXIOM_WHITELIST`. (`model/constants.v`'s
-   `secp256k1_N_prime` used to be a third allowed file; it is now a `Qed`
-   lemma, discharged by a coqprime Pocklington certificate in
-   `theory/primality/n.v`, so it no longer declares an `Axiom` at all.)
+   `example590`) plus `model/tables.v` (the three precomputed-table
+   `Parameter`s and their nine characterisation `Axiom`s) -- see
+   `audit/AXIOM_WHITELIST`. (`model/constants.v`'s `secp256k1_N_prime` used
+   to be a fourth allowed file; it is now a `Qed` lemma, discharged by a
+   coqprime Pocklington certificate in `theory/primality/n.v`, so it no
+   longer declares an `Axiom` at all.) Every name `model/tables.v` declares
+   must also appear in `audit/scaffold.axioms` (one name per line, no
+   comments needed); the gate prints `model/tables.v`'s Parameter/Axiom
+   counts. `scaffold.axioms` is a source-side name-completeness ratchet only
+   -- it is NOT consulted by gate 4, and its names are not whitelisted there
+   until some body proof's assumption cone actually depends on one of them
+   (a separate, reviewed `audit/AXIOM_WHITELIST` edit at that time).
 3. Headline pin -- a statement file under `audit/` (`statement`, added with
    the reviewer-facing headline) probes the audited theorem(s) by name and
    pasted type, so a silent rename or a swap for a weaker namesake fails the
@@ -479,4 +502,6 @@ wholesale drop has a home decided in advance.
 
 `make audit` runs all seven. `make axioms` runs the model/theory purity check
 plus gate 4 alone (the narrower check this project has always run before a
-commit). `make style` runs gate 5 alone.
+commit). `make style` runs gate 5 alone. `make model-tests` compiles the slow
+`model/tests_slow_*.v` KATs one at a time (10 to 50 minutes each) -- it is
+separate from both `proof` and `audit`.

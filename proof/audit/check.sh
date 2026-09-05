@@ -13,11 +13,18 @@
 #
 # Gates:
 #   0  FRESH      every _RocqProject .v has a fresh .vo, no orphan .vo under
-#                 the layer dirs, every layer .v is tracked in _RocqProject.
+#                 the layer dirs, every layer .v is tracked in _RocqProject
+#                 (model/tests_slow_*.v exempted, like audit/assumptions.v --
+#                 those files are deliberately excluded from _RocqProject
+#                 because they cost 10-50 minutes EACH; see `make model-tests`).
 #   0b AST        clight/extraction.v matches the pinned audit/extraction.sha256.
-#   1  GAPS       no Admitted./admit./give_up. in the proof layers.
+#   1  GAPS       every Admitted./admit./give_up. site appears in
+#                 audit/scaffold.txt (path:lemma, exact match both directions).
 #   2  AXIOMS-SRC Axiom/Parameter/Hypothesis/Conjecture declarations confined
-#                 to the two files on the trust base.
+#                 to the three files on the trust base -- the two divsteps
+#                 bound files plus model/tables.v (the precomputed-table
+#                 Parameters/Axioms), whose declared names must all
+#                 appear in audit/scaffold.axioms.
 #   3  PIN        audit/statement.v (if present) has a fresh .vo; SKIP if
 #                 the file does not exist yet.
 #   4  CONE       audit/assumptions.log's Print-Assumptions closure stays
@@ -27,6 +34,13 @@
 #                 the verif/ gprog import, doc path references, and the
 #                 tactics/ layering rule -- 9 lettered sub-checks (5a, 5b,
 #                 5c, 5c2, 5d, 5e, 5f, 5g, 5h).
+#
+# NOTE: audit/scaffold.axioms (gate 2) is a name-completeness ratchet over
+# model/tables.v's OWN Parameter/Axiom declarations -- it is not consulted by
+# gate 4 and its names are NOT whitelisted for gate 4 until some body proof's
+# assumption cone actually depends on one of them; that will be a deliberate,
+# reviewed audit/AXIOM_WHITELIST edit at that time, not an automatic promotion
+# from this file.
 #
 # Each gate prints exactly one summary line:
 #   GATE <n> <NAME>: OK -- ...
@@ -92,12 +106,16 @@ gate_0_fresh() {
   done < <(find $LAYER_DIRS audit clight -name '*.vo' 2>/dev/null | sort)
 
   # (iii) every .v under the layer dirs + clight is listed in _RocqProject,
-  # or is one of the standalone exceptions.
+  # or is one of the standalone exceptions.  model/tests_slow_*.v are the
+  # slow curve KATs (10-50 min EACH, see `make model-tests`): deliberately
+  # excluded from _RocqProject the same way audit/assumptions.v is.
+  local exempt_slow=0
   listed=$(grep -E '^\S+\.v$' _RocqProject | sort -u)
   while IFS= read -r v; do
     [ -n "$v" ] || continue
     case "$v" in
       audit/assumptions.v | audit/statement.v | secp256k1_fv.v) continue ;;
+      model/tests_slow_*.v) exempt_slow=$((exempt_slow + 1)); continue ;;
     esac
     if ! grep -qxF "$v" <<<"$listed"; then
       problems+=("(iii) $v -- not listed in _RocqProject")
@@ -105,10 +123,12 @@ gate_0_fresh() {
   done < <(find $LAYER_DIRS clight -name '*.v' 2>/dev/null | sort)
 
   if [ "${#problems[@]}" -eq 0 ]; then
-    echo "$name: OK -- all tracked .v compiled+fresh, no orphan .vo, no untracked .v"
+    echo "$name: OK -- all tracked .v compiled+fresh, no orphan .vo, no untracked .v" \
+      "($exempt_slow model/tests_slow_*.v exempted)"
     return 0
   fi
-  echo "$name: FAIL -- ${#problems[@]} freshness/tracking problem(s):"
+  echo "$name: FAIL -- ${#problems[@]} freshness/tracking problem(s)" \
+    "($exempt_slow model/tests_slow_*.v exempted):"
   printf '%s\n' "${problems[@]}" | print_capped
   return 1
 }
@@ -146,16 +166,102 @@ gate_0b_ast() {
 
 gate_1_gaps() {
   local name="GATE 1 GAPS"
+  local scaffold="audit/scaffold.txt"
+  local -a problems=()
+
+  if [ ! -e "$scaffold" ]; then
+    echo "$name: FAIL -- $scaffold not present"
+    return 1
+  fi
+
+  # ---- ratchet: an optional "# count: N" header on scaffold.txt's line 1 ----
+  local first_line declared_count=""
+  first_line=$(head -n1 "$scaffold")
+  if [[ "$first_line" =~ ^#\ count:\ ([0-9]+)$ ]]; then
+    declared_count="${BASH_REMATCH[1]}"
+  fi
+
+  # ---- the registered set: path:lemma, "#" comments and blanks stripped ----
+  local -a scaffold_entries=()
+  local line
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    case "$line" in
+      '#'*) continue ;;
+    esac
+    scaffold_entries+=("$line")
+  done <"$scaffold"
+
+  local scaffold_count="${#scaffold_entries[@]}"
+  if [ -n "$declared_count" ] && [ "$declared_count" -ne "$scaffold_count" ]; then
+    problems+=("ratchet: $scaffold declares '# count: $declared_count' but has $scaffold_count real entries")
+  fi
+
+  # ---- the actual set: every Admitted./admit./give_up. site, keyed as
+  # "path:lemma" via the nearest preceding
+  # Lemma/Theorem/Corollary declaration in the same file. ----
   local hits
+  hits=$(grep -rnE '\b(Admitted|admit|give_up)\.' $LAYER_DIRS 2>/dev/null | grep -v '^$')
 
-  hits=$(grep -rnE '\b(Admitted|admit|give_up)\.' $LAYER_DIRS 2>/dev/null)
+  local -a actual_keys=()
+  local -A per_file_count=()
+  local f files lns pairs p lemma_name
+  files=$(printf '%s\n' "$hits" | cut -d: -f1 | sort -u)
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    lns=$(printf '%s\n' "$hits" | awk -F: -v file="$f" '$1==file{print $2}')
+    pairs=$(awk -v lines="$lns" '
+      BEGIN {
+        n = split(lines, arr, "\n")
+        for (i = 1; i <= n; i++) { want[arr[i]] = 1 }
+        lemma = ""
+      }
+      /^(Lemma|Theorem|Corollary)[ \t]+/ {
+        line = $0
+        sub(/^(Lemma|Theorem|Corollary)[ \t]+/, "", line)
+        split(line, parts, /[ \t:.(]/)
+        lemma = parts[1]
+      }
+      (FNR in want) { print FNR ":" lemma }
+    ' "$f")
+    while IFS= read -r p; do
+      [ -n "$p" ] || continue
+      lemma_name="${p#*:}"
+      actual_keys+=("$f:$lemma_name")
+      per_file_count["$f"]=$(( ${per_file_count["$f"]:-0} + 1 ))
+    done <<<"$pairs"
+  done <<<"$files"
 
-  if [ -z "$hits" ]; then
-    echo "$name: OK -- no proof gaps"
+  local actual_sorted scaffold_sorted missing stale m s
+  actual_sorted=$(printf '%s\n' "${actual_keys[@]}" | sort -u)
+  scaffold_sorted=$(printf '%s\n' "${scaffold_entries[@]}" | sort -u)
+  missing=$(comm -23 <(printf '%s\n' "$actual_sorted") <(printf '%s\n' "$scaffold_sorted"))
+  stale=$(comm -13 <(printf '%s\n' "$actual_sorted") <(printf '%s\n' "$scaffold_sorted"))
+
+  while IFS= read -r m; do
+    [ -n "$m" ] && problems+=("unregistered gap (no $scaffold entry): $m")
+  done <<<"$missing"
+  while IFS= read -r s; do
+    [ -n "$s" ] && problems+=("stale $scaffold entry (no matching Admitted site): $s")
+  done <<<"$stale"
+
+  local -a per_file_lines=()
+  for f in "${!per_file_count[@]}"; do
+    per_file_lines+=("$f: ${per_file_count[$f]}")
+  done
+  IFS=$'\n' per_file_lines=($(printf '%s\n' "${per_file_lines[@]}" | sort))
+  unset IFS
+
+  if [ "${#problems[@]}" -eq 0 ]; then
+    echo "$name: OK -- ${#actual_keys[@]} registered gap(s) in ${#per_file_count[@]} file(s)" \
+      "match $scaffold exactly"
+    printf '%s\n' "${per_file_lines[@]}" | print_capped
     return 0
   fi
-  echo "$name: FAIL -- proof gap(s):"
-  printf '%s\n' "$hits" | print_capped
+  echo "$name: FAIL -- gap register mismatch:"
+  printf '%s\n' "${problems[@]}" | print_capped
+  echo "    per-file registered counts:"
+  printf '%s\n' "${per_file_lines[@]}" | print_capped
   return 1
 }
 
@@ -167,7 +273,11 @@ gate_2_axioms_src() {
   local -a allowed=(
     "theory/modinv/divsteps/bound724.v"
     "theory/modinv/divsteps/bound590.v"
+    "model/tables.v"  # precomputed-table Parameters/Axioms; names
+                      # gated against audit/scaffold.axioms below.
   )
+  local tables="model/tables.v"
+  local scaffold_axioms="audit/scaffold.axioms"
   local hits line f ok a
   local -a bad=()
 
@@ -182,12 +292,35 @@ gate_2_axioms_src() {
     [ "$ok" -eq 0 ] && bad+=("$line")
   done <<<"$hits"
 
-  if [ "${#bad[@]}" -eq 0 ]; then
-    echo "$name: OK -- Axiom/Parameter/Hypothesis/Conjecture confined to the 2 declared files"
+  # model/tables.v: every declared Parameter/Axiom name must be listed in
+  # audit/scaffold.axioms (one-directional: scaffold.axioms may not have
+  # stray extra names checked here, only the source-side confinement).
+  local -a unlisted=()
+  local param_count=0 axiom_count=0 kw nm
+  if [ -e "$tables" ]; then
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      kw=$(awk '{print $1}' <<<"$line")
+      nm=$(awk '{print $2}' <<<"$line")
+      case "$kw" in
+        Axiom | Axioms | Hypothesis | Hypotheses | Conjecture) axiom_count=$((axiom_count + 1)) ;;
+        Parameter | Parameters) param_count=$((param_count + 1)) ;;
+      esac
+      if [ ! -e "$scaffold_axioms" ] || ! grep -qxF "$nm" "$scaffold_axioms"; then
+        unlisted+=("$tables: $nm not listed in $scaffold_axioms")
+      fi
+    done < <(grep -E '^\s*(Axiom|Axioms|Parameter|Parameters|Hypothesis|Hypotheses|Conjecture)\b' "$tables")
+  else
+    unlisted+=("$tables not present")
+  fi
+
+  if [ "${#bad[@]}" -eq 0 ] && [ "${#unlisted[@]}" -eq 0 ]; then
+    echo "$name: OK -- Axiom/Parameter/Hypothesis/Conjecture confined to the 3 declared files" \
+      "($tables: $param_count Parameter(s) + $axiom_count Axiom(s), all in $scaffold_axioms)"
     return 0
   fi
-  echo "$name: FAIL -- assumption declared outside {${allowed[*]}}:"
-  printf '%s\n' "${bad[@]}" | print_capped
+  echo "$name: FAIL -- assumption confinement/name problem(s):"
+  printf '%s\n' "${bad[@]}" "${unlisted[@]}" | print_capped
   return 1
 }
 
