@@ -14,6 +14,7 @@ Makefile.rocq.conf
 .lia.cache
 .nia.cache
 .Makefile.rocq.d
+.axioms/
 
-# axioms-target generated log (audit/check-axioms.sh input)
-audit/assumptions.log
+# coqdoc rendering of the story files (make html)
+html/

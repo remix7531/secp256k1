@@ -1,0 +1,278 @@
+(** * Verif_scalar_reduce: Proof of body_secp256k1_scalar_reduce *)
+(** Copyright (C) 2026 remix7531
+    SPDX-License-Identifier: MIT *)
+
+Require Import secp256k1.vst.base.
+Require Import secp256k1.vst.helper.notations.
+Require Import secp256k1.vst.gprog.
+Require Import secp256k1.vst.scalar.impl.
+Require Import secp256k1.vst.tactics.core.
+Require Import secp256k1.vst.tactics.int128.
+Require Import secp256k1.vst.tactics.scalar.
+
+(* ================================================================= *)
+(** ** secp256k1_scalar_reduce -- [r += overflow * (2^256 - N)]. *)
+
+Lemma body_secp256k1_scalar_reduce:
+  semax_body Vprog Gprog
+    f_secp256k1_scalar_reduce spec_secp256k1_scalar_reduce.
+Proof.
+  start_function.
+
+  rename SH into Hsh_writable.
+  rename H into Hov_range.       (* 0 <= overflow <= 2 *)
+
+  (* ===== Stage 0: Setup -- name limbs and compute overflow products ===== *)
+  set (d0 := limb (2^64) (u256_val r) 0).
+  set (d1 := limb (2^64) (u256_val r) 1).
+  set (d2 := limb (2^64) (u256_val r) 2).
+  set (d3 := limb (2^64) (u256_val r) 3).
+  assert (Hd0 : 0 <= d0 < 2^64) by (subst d0; apply Z.mod_pos_bound; lia).
+  assert (Hd1 : 0 <= d1 < 2^64) by (subst d1; apply Z.mod_pos_bound; lia).
+  assert (Hd2 : 0 <= d2 < 2^64) by (subst d2; apply Z.mod_pos_bound; lia).
+  assert (Hd3 : 0 <= d3 < 2^64) by (subst d3; apply Z.mod_pos_bound; lia).
+
+  assert (Hov0 : 0 <= overflow * N_C_0 < 2^64) by rep_lia.
+  assert (Hov1 : 0 <= overflow * N_C_1 < 2^64) by rep_lia.
+  assert (Hov2 : 0 <= overflow * N_C_2 < 2^64) by rep_lia.
+
+  (* ===== Round 0: t = d[0] + overflow*N_C_0 ===== *)
+
+  (* _t'8 = r->d[0] *)
+  forward.
+
+  (* secp256k1_u128_from_u64(&t, r->d[0]) *)
+  forward_call_u128_from_u64 v_t (mkUInt64 d0 Hd0) Tsh t_init Ht_init.
+  { entailer!. subst d0. unfold Znth. simpl.
+
+    rewrite limb_fold0. reflexivity. }
+
+  (* secp256k1_u128_accum_u64(&t, (uint64_t)overflow * N_C_0) *)
+  forward_call_u128_accum_u64 v_t t_init (mkUInt64 (overflow * N_C_0) Hov0) Tsh acc0 Hacc0_raw.
+  { solve_reduce_expr_match. }
+
+  assert (Hacc0 : u128_val acc0 = d0 + overflow * N_C_0)
+    by (rewrite Hacc0_raw, Ht_init; simpl; lia).
+  clear Ht_init Hacc0_raw t_init.
+
+  (* r->d[0] = secp256k1_u128_to_u64(&t) *)
+  forward_call_u128_to_u64 v_t acc0 Tsh lo0 Hlo0.
+  forward.
+
+  (* secp256k1_u128_rshift(&t, 64) *)
+  forward_call_u128_rshift v_t acc0 Tsh carry0 Hcarry0.
+
+  assert (Hcarry0_val : u128_val carry0 = (d0 + overflow * N_C_0) / 2^64)
+    by (rewrite Hcarry0, Hacc0; reflexivity).
+  clear Hcarry0.
+
+  (* ===== Round 1: t += d[1] + overflow*N_C_1 ===== *)
+
+  (* _t'7 = r->d[1] *)
+  forward.
+
+  (* secp256k1_u128_accum_u64(&t, r->d[1]) *)
+  forward_call_u128_accum_u64 v_t carry0 (mkUInt64 d1 Hd1) Tsh t1a Ht1a.
+  { rewrite Hcarry0_val.
+    simpl u64_val.
+    apply reduce_u128_div_step; rep_lia. }
+
+  (* secp256k1_u128_accum_u64(&t, (uint64_t)overflow * ~N_1) *)
+  forward_call_u128_accum_u64 v_t t1a (mkUInt64 (overflow * N_C_1) Hov1) Tsh acc1 Hacc1_raw.
+  { solve_reduce_expr_match. }
+  { rewrite Ht1a.
+    simpl u64_val.
+    rewrite Hcarry0_val.
+    pose proof (reduce_carry_lt_2 (d0 + overflow * N_C_0) ltac:(rep_lia) ltac:(rep_lia)).
+    rep_lia. }
+  assert (Hacc1 : u128_val acc1 =
+    (d0 + overflow * N_C_0) / 2^64 + d1 + overflow * N_C_1)
+    by (rewrite Hacc1_raw, Ht1a; simpl u64_val; rewrite Hcarry0_val; lia).
+  clear Ht1a Hacc1_raw Hcarry0_val carry0 t1a.
+
+  (* r->d[1] = secp256k1_u128_to_u64(&t) *)
+  forward_call_u128_to_u64 v_t acc1 Tsh lo1 Hlo1.
+  forward.
+
+  (* secp256k1_u128_rshift(&t, 64) *)
+  forward_call_u128_rshift v_t acc1 Tsh carry1 Hcarry1.
+
+  assert (Hcarry1_val : u128_val carry1 = u128_val acc1 / 2^64)
+    by exact Hcarry1.
+  clear Hcarry1.
+
+  (* ===== Round 2: t += d[2] + overflow*N_C_2 ===== *)
+
+  (* _t'6 = r->d[2] *)
+  forward.
+
+  (* secp256k1_u128_accum_u64(&t, r->d[2]) *)
+  forward_call_u128_accum_u64 v_t carry1 (mkUInt64 d2 Hd2) Tsh t2a Ht2a.
+
+  (* secp256k1_u128_accum_u64(&t, (uint64_t)overflow * N_C_2) *)
+  forward_call_u128_accum_u64 v_t t2a (mkUInt64 (overflow * N_C_2) Hov2) Tsh acc2 Hacc2_raw.
+  { solve_reduce_expr_match. }
+  assert (Hacc2 : u128_val acc2 =
+    ((d0 + overflow * N_C_0) / 2^64 + d1 + overflow * N_C_1) / 2^64
+    + d2 + overflow * N_C_2)
+    by (rewrite Hacc2_raw, Ht2a; simpl u64_val; rewrite Hcarry1_val, Hacc1; lia).
+  clear Ht2a Hacc2_raw Hcarry1_val carry1 t2a.
+
+  (* r->d[2] = secp256k1_u128_to_u64(&t) *)
+  forward_call_u128_to_u64 v_t acc2 Tsh lo2 Hlo2.
+  forward.
+
+  (* secp256k1_u128_rshift(&t, 64) *)
+  forward_call_u128_rshift v_t acc2 Tsh carry2 Hcarry2.
+
+  assert (Hcarry2_val : u128_val carry2 = u128_val acc2 / 2^64)
+    by exact Hcarry2.
+  clear Hcarry2.
+
+  (* ===== Round 3: t += d[3] (no complement term) ===== *)
+
+  (* _t'5 = r->d[3] *)
+  forward.
+
+  (* secp256k1_u128_accum_u64(&t, r->d[3]) *)
+  forward_call_u128_accum_u64 v_t carry2 (mkUInt64 d3 Hd3) Tsh acc3 Hacc3_raw.
+  assert (Hacc3 : u128_val acc3 =
+    (((d0 + overflow * N_C_0) / 2^64 + d1 + overflow * N_C_1) / 2^64
+     + d2 + overflow * N_C_2) / 2^64 + d3)
+    by (rewrite Hacc3_raw; simpl u64_val; rewrite Hcarry2_val, Hacc2; lia).
+  clear Hacc3_raw Hcarry2_val carry2.
+
+  (* r->d[3] = secp256k1_u128_to_u64(&t) *)
+  forward_call_u128_to_u64 v_t acc3 Tsh lo3 Hlo3.
+  forward.
+
+  (* return overflow *)
+  forward.
+
+  (* ===== Stage 4: Postcondition ===== *)
+
+  clear Hov0 Hov1 Hov2.
+
+  set (result_val := (u256_val r + overflow * (2^256 - secp256k1_N)) mod 2^256).
+  assert (Hresult_range' : 0 <= result_val < 2^256)
+    by (subst result_val; apply Z.mod_pos_bound; lia).
+
+  Exists (mkUInt256 result_val Hresult_range').
+  entailer!.
+
+  (* ===== Stage 5: VST memory cleanup ===== *)
+
+  (* Goal: upd_Znth chain |-- uint256_to_val result *)
+  apply derives_refl'.
+  f_equal.
+
+  (* Collapse the [upd_Znth] chain to a plain 4-element list *)
+  transitivity [uint64_to_val (u128_lo acc0);
+                uint64_to_val (u128_lo acc1);
+                uint64_to_val (u128_lo acc2);
+                uint64_to_val (u128_lo acc3)].
+  { unfold uint256_to_val.
+    simpl u256_val.
+    reflexivity. }
+
+  (* Unfold both sides to [Vlong (Int64.repr (limb (2^64) ...))] form *)
+  unfold uint256_to_val, uint64_to_val, u128_lo.
+  simpl u64_val.
+  simpl u256_val.
+
+  (* Substitute accumulator values *)
+  rewrite Hacc0, Hacc1, Hacc2, Hacc3.
+
+  set (t0 := d0 + overflow * N_C_0).
+  set (t1 := t0 / 2^64 + d1 + overflow * N_C_1).
+  set (t2 := t1 / 2^64 + d2 + overflow * N_C_2).
+  set (t3 := t2 / 2^64 + d3).
+
+  (* Normalize [Z.pow_pos 2 64] notation to [2^64] *)
+  change (Z.pow_pos 2 64) with (2^64).
+  (* Reduce to 4 pure Z equalities *)
+  cut (t0 mod 2^64 = limb (2^64) result_val 0 /\
+       t1 mod 2^64 = limb (2^64) result_val 1 /\
+       t2 mod 2^64 = limb (2^64) result_val 2 /\
+       t3 mod 2^64 = limb (2^64) result_val 3).
+  { intros [-> [-> [-> ->]]].
+    unfold limb. simpl Z.of_nat.
+    rewrite Z.pow_0_r, Z.div_1_r, Z.pow_1_r.
+    change ((2^64)^2) with (2^128).
+    change ((2^64)^3) with (2^192).
+    reflexivity. }
+
+  assert (Hchain_bound :
+    0 <= u256_val r + overflow * (2^256 - secp256k1_N) < 2 * 2^256).
+  { pose proof (u256_range r). unfold secp256k1_N. lia. }
+
+  clear - r overflow Hov_range Hchain_bound
+          d0 d1 d2 d3 Hd0 Hd1 Hd2 Hd3
+          t0 t1 t2 t3 result_val Hresult_range'.
+
+  (* Unfold [limb (2^64) result_val i] to [(result_val / (2^64)^i) mod 2^64] *)
+  unfold limb.
+  simpl (Z.of_nat _).
+
+  (* ===== Stage 6: Pure Z arithmetic ===== *)
+
+  (* Decompose u256_val r into limbs *)
+  assert (Hdecomp : u256_val r = d0 + d1 * 2^64 + d2 * 2^128 + d3 * 2^192).
+  { subst d0 d1 d2 d3.
+    pose proof (u256_as_eval4 r) as Heval.
+    unfold eval4, u256_limb in Heval.
+    simpl u64_val in Heval.
+    change (Z.pow_pos 2 64) with (2^64) in Heval.
+    change ((2^64)^2) with (2^128) in Heval.
+    change ((2^64)^3) with (2^192) in Heval.
+    lia. }
+
+  (* Work with B = 2^64 *)
+  set (B := 2^64) in *.
+
+  (* Apply the carry-chain identity *)
+  pose proof (reduce_carry_chain B d0 d1 d2 d3 N_C_0 N_C_1 N_C_2 overflow
+    ltac:(subst B; lia) Hd0 Hd1 Hd2 Hd3
+    ltac:(rep_lia) ltac:(rep_lia) ltac:(rep_lia)
+    ltac:(lia)) as Hchain_raw.
+  cbv zeta in Hchain_raw.
+  unfold eval4 in Hchain_raw.
+  replace (B ^ 2) with (B * B) in Hchain_raw by ring.
+  replace (B ^ 3) with (B * B * B) in Hchain_raw by ring.
+  fold t0 t1 t2 t3 in Hchain_raw.
+
+  assert (HdecompB : u256_val r = d0 + d1 * B + d2 * (B*B) + d3 * (B*B*B))
+    by (subst B; lia).
+  rewrite <- HdecompB in Hchain_raw.
+  set (C := N_C_0 + N_C_1 * B + N_C_2 * (B * B)) in *.
+  assert (HC_eq : C = 2^256 - secp256k1_N) by (subst C B; rewrite secp256k1_N_C_limbs; ring).
+  destruct (Hchain_raw ltac:(rewrite HC_eq; subst B; lia))
+    as (Hchain_eq & Hr_z_bnd & Hhi_bnd).
+
+  (* r_z = result_val via carry chain + mod *)
+  set (r_z := (t0 mod B) + (t1 mod B) * B
+            + (t2 mod B) * (B * B) + (t3 mod B) * (B * B * B)) in *.
+  assert (Hchain : result_val = r_z).
+  { subst result_val.
+    rewrite <- HC_eq, <- Hchain_eq.
+    replace (B * B * B * B) with (2^256) by (subst B; ring).
+    rewrite Z_mod_plus_full.
+    apply Z.mod_small. subst B. lia. }
+  rewrite Hchain.
+  clear Hchain Hchain_eq Hr_z_bnd Hhi_bnd Hchain_raw
+        HC_eq result_val Hresult_range' Hchain_bound.
+
+  (* Extract individual limbs via limbs_eval4 *)
+  pose proof (limbs_eval4 B (t0 mod B) (t1 mod B) (t2 mod B) (t3 mod B)
+    ltac:(subst B; lia)
+    ltac:(apply Z.mod_pos_bound; subst B; lia)
+    ltac:(apply Z.mod_pos_bound; subst B; lia)
+    ltac:(apply Z.mod_pos_bound; subst B; lia)
+    ltac:(apply Z.mod_pos_bound; subst B; lia)) as [Hl0 [Hl1 [Hl2 Hl3]]].
+  unfold eval4 in Hl0, Hl1, Hl2, Hl3.
+  replace (B^2) with (B * B) in Hl0, Hl1, Hl2, Hl3 by ring.
+  replace (B^3) with (B * B * B) in Hl0, Hl1, Hl2, Hl3 by ring.
+  clear - Hl0 Hl1 Hl2 Hl3.
+
+  exact (conj (eq_sym Hl0) (conj (eq_sym Hl1) (conj (eq_sym Hl2) (eq_sym Hl3)))).
+Qed.

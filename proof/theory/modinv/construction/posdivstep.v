@@ -27,7 +27,7 @@ Require Import ZArith.Zpow_facts.
 Require Import Lia.
 Require Import List.
 
-Require Import secp256k1.theory.extra_math.
+Require Import secp256k1.theory.integers.extra_math.
 Require secp256k1.theory.modinv.construction.divstep.
 
 Open Scope list_scope.

@@ -5,6 +5,71 @@ Rocq specifications and VST proofs for libsecp256k1.
 CompCert's `clightgen` extracts the production C functions and precomputed
 tables through `extraction.c`.
 
+## Build
+
+From the repository root:
+
+```sh
+nix develop
+cd proof
+make proof             # build the project
+make specification     # build only the specification and its dependencies
+make html              # render the specification
+make axioms            # report project assumptions
+make vectors           # run SHA256 and BIP340 known-answer tests
+```
+
+`make axioms` reports assumptions from every module in `_RocqProject` and
+its imports without rechecking compiled proofs. Review the reported axioms
+and admitted proofs.
+
+`make verif-scalar` builds one C proof subsystem and its dependencies.
+The other subsystem targets are `verif-int128`, `verif-util`, `verif-field`,
+and `verif-modinv`. Vector tests are separate because scalar multiplication
+makes them slow. `make clean` removes proof artifacts and HTML, preserving
+`clight/` and the arithmetic tactic caches. `make purge` also removes
+those retained files.
+
+## Read the proof
+
+Start with `specification.v`, or its rendered version at
+`html/secp256k1.specification.html`. The HTML hides supporting proof details
+and includes a source download for use in a Rocq editor.
+
+- `specification.v` contains the mathematics and public C API contracts.
+- `theory/` contains integer lemmas and models of C algorithms.
+- `vst/` contains C contracts and individual body proofs. The Schnorr VSU
+  target is in `specification.v`.
+- `vectors/` contains known-answer tests.
+- `doc/` contains the HTML renderer, templates, and stylesheet.
+- `STYLE.md` describes proof conventions.
+
+## Scope
+
+Consult the theorem statements and the output of `make axioms` for the
+guarantees and assumptions of the development.
+
+The proofs establish functional correctness and memory safety under CompCert
+semantics. They say nothing about execution time, side channels, or the
+constant-time properties the library's masking and `volatile` hardening are
+written to provide. Descriptions of a function as constant-time in this tree
+name the upstream design intent, not a proved property.
+
+The proofs apply to the extraction configuration in `Makefile` and
+`extraction.c`: the struct-based 128-bit backend, libc-free code, software
+bit counting, disabled `VERIFY` checks, and removed `volatile` qualifiers.
+Callers must satisfy each function's contract.
+
+The library source itself was changed to make it tractable for verification:
+the scalar accumulator macros became `static inline` functions, a few helpers
+were lifted out of inline code, and the library routes memory operations
+through internal wrappers. `git diff <merge-base>...HEAD -- src/ include/`
+shows the whole production diff. Those changes are not yet upstream.
+
+The proof relies on Rocq, VST, CompCert semantics, and the reported
+assumptions. Whether the specification states the intended BIP340 rules
+remains a matter for review.
+
 ## License
 
 MIT, under the repository's `COPYING`.
@@ -62,3 +127,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+The specification imports Coqprime as an external dependency. Coqprime is
+licensed under the GNU Lesser General Public License version 2.1 in its
+entirety; the modules used here are `List.UList`, `PrimalityTest.Euler`,
+`PrimalityTest.Zp`, `elliptic.GZnZ`, `elliptic.SMain`, `elliptic.ZEll`, and
+`examples.PocklingtonRefl`. It is not vendored and no build artifacts are
+distributed, so the proof tree remains a source-only MIT distribution.

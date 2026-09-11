@@ -14,7 +14,7 @@
 
 Require Import ZArith.
 Require Import Lia.
-Require Import secp256k1.theory.extra_math.
+Require Import secp256k1.theory.integers.extra_math.
 
 Local Open Scope Z.
 

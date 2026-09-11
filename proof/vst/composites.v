@@ -2,22 +2,11 @@
 (** Copyright (C) 2026 remix7531
     SPDX-License-Identifier: MIT *)
 
-(** clightgen numbers the extraction's anonymous structs ([__755], [__837],
-    ...) and renumbers them whenever the identifier set changes -- the [_acc]
-    id alone has drifted [__1234 -> __1238 -> __1251 -> __1191] across feature
-    additions.  The member NAMES ([_d], [_lo]/[_hi], [_n], ...) are stable
-    Coq identifiers, so instead of hand-pinning the numbers, the
-    [contract/helper/structs_*.v] files derive them: [derive_struct_id]
-    scans [extraction.composites] for the unique Struct whose member list
-    matches a given [(name, optional exact type)] signature.
-
-    - A non-match or an ambiguous match is a COMPILE ERROR at the structs
-      file, not a silent mismatch at proof time.
-    - When two structs share member names (e.g. a future [fe] vs
-      [fe_storage], both [{ _n }]), disambiguate with the exact member type
-      ([Some (tarray tulong 5)] vs [Some (tarray tulong 4)]).
-    - Nested composites are matched by member name only, so inner-id drift
-      never propagates into a signature. *)
+(** Anonymous struct numbers can change on extraction. Match structs by
+    member names and optional exact types, requiring a unique match.
+    Exact types distinguish structs with the same names, such as field
+    elements and field storage. Nested struct members match by name to
+    avoid depending on their generated numbers. *)
 
 From Stdlib Require Import PArith.
 From compcert Require Import AST Ctypes.

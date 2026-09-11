@@ -98,8 +98,8 @@ not compress (the per-phase rhythm is required, not optional).
 - **No** blank line between a comment and the tactic it annotates.
 - One blank line between top-level `Lemma` / `Definition`s; none before `Qed`.
 
-Target rhythm: the mul-pipeline files (`verif/scalar/impl/scalar_muladd.v`,
-`verif/scalar/impl/scalar_mul_512.v`) -- roughly one blank line per logical
+Target rhythm: the mul-pipeline files (`vst/scalar/verif/impl/scalar_muladd.v`,
+`vst/scalar/verif/impl/scalar_mul_512.v`) -- roughly one blank line per logical
 step, about 20% of lines blank. Files compressed well below that read as dense
 and must be re-spaced.
 
@@ -113,7 +113,11 @@ and must be re-spaced.
     SPDX-License-Identifier: MIT *)
 ```
 Continuation lines of the copyright block are indented 4 spaces to align under the text.
-The `<Module>` is the file's logical name (e.g. `Verif_muladd`, `model.scalar`).
+The `<Module>` is the file's logical name (e.g. `Verif_muladd`, `vst.scalar.contract`).
+
+`specification.v` is the exception. Its licence line is a plain comment
+that does not render. Its numbered headings form one continuous document.
+See The specification below.
 
 ### Section banner: ONE line ABOVE the heading (never a sandwich)
 
@@ -126,6 +130,7 @@ The `<Module>` is the file's logical name (e.g. `Verif_muladd`, `model.scalar`).
 - The banner is exactly **65 `=`** signs: `(* ` + 65x`=` + ` *)` (71 chars). It goes **above** the `(** ** ... *)` heading only -- do NOT add a banner below it, and do NOT stack `=`/`-` banners.
 - Headings are descriptive: a name, then ` -- ` separating it from elaboration, `[brackets]` around code/identifier references, ending with `.`
   (e.g. `(** ** Lengths -- [SHA256] / [chain]. *)`). One blank line follows the heading.
+  Specification headings are numbered noun phrases instead (`(** ** 3.2 Field Elements *)`), with no ` -- ` and no period; see "The specification".
 - Subsections use `(** *** Name *)`, optionally preceded by a 65-`-` divider:
   ```coq
   (* ----------------------------------------------------------------- *)
@@ -157,10 +162,58 @@ The `<Module>` is the file's logical name (e.g. `Verif_muladd`, `model.scalar`).
 - `(** ... *)` doc comments are used ONLY outside proofs (on `Lemma` / `Definition`),
   describing intent -- the C op, the math, or the postcondition -- in 1-3 lines, with
   `[name]` for code references. Inside proofs use only `(* ... *)`.
-- Branches / conjuncts get a short **tag**, not prose:
-  `(* branch: j = 0 -- post reduces to a *)`, `(* conjunct 1: (sum / B) mod B = a1 *)`.
+- Branch comments name the case or claim being proved. Omit mechanical
+  prefixes such as `branch:` and explain what matters in that case.
+  For example, `(* j = 0: the postcondition reduces to a. *)`.
 - For a multi-step math proof, stage it with `(* Setup: ... *)` / `(* Main: ... *)` /
   `(* Closeout: ... *)`.
+
+## The specification
+
+`specification.v` is the single authored document. Chapters 1 through 7
+introduce the mathematics inside `Module Math`. Chapter 8 states the VST
+contracts and implementation target inside `Module api`. Hidden supporting
+proofs remain in the same source, in dependency order. The reader is
+technical but need not know Rocq, VST, formal methods or Schnorr signatures.
+
+- Explain the purpose of an operation before its formal definition.
+  Introduce unfamiliar mathematics with a small example. Explain Rocq
+  notation when it first matters. Group related helpers under one
+  explanation instead of narrating each definition.
+- Build trust in the specified behaviour. State inputs, outputs, bounds
+  and rejection conditions. Distinguish a definition from a theorem and
+  the target verification proposition from a proved implementation claim.
+  Keep development status in project documentation and issue tracking. Avoid unsupported counts,
+  timings and claims that all verification is complete.
+- Do not refer to the presentation as a story, a guide or this file.
+  Avoid repository tours, tutorial section references and mechanical
+  transitions between files. Mention Pieter Wuille's inspiration once
+  in the opening. Each section should explain its own subject.
+- Link mathematical background to Wikipedia and Rocq learning material
+  to official documentation. Link standards to their primary sources.
+  Pin C source links to the latest release verified when updating the
+  text. Verify line anchors against that release or link the whole file.
+- Use emphasis and lists when they help comprehension. Coqdoc supports
+  `_italic_`, `#<strong>bold</strong>#`, `[code]` and
+  `{{https://example.org}link text}`. Keep explanatory equations close
+  to the definitions they explain.
+- Keep meaningful mathematical proofs visible. Explain the strategy
+  before a multi-step proof and comment each branch with its case or
+  claim. Add comments for invariants and steps whose purpose is unclear.
+  Do not prefix branch comments with `branch:`.
+- Hide obligation proof blocks, imports, scope directives, local
+  obligation tactics and instance registrations with coqdoc hide
+  markers. Hide other machinery only when it would confuse the reader
+  or adds no relevant argument. Keep definitions, preconditions,
+  theorem statements and actual proof status visible. Define instances
+  first, then hide their exported registration before the first use.
+- Line 1 is `(* Copyright (C) 2026 remix7531. SPDX-License-Identifier: MIT *)`.
+  Chapters use `(** * N. Title *)`. Subsections use `(** ** N.M Title *)`,
+  with no trailing period. The renderer removes section banners.
+- Use ASCII. Prose punctuation is commas, full stops and colons.
+  Code, URLs and mathematical expressions retain their own syntax.
+  Wrap doc comments at 72 columns with a four-space continuation
+  indent. An unbreakable URL or identifier may run over.
 
 ## Context & Naming
 
@@ -237,8 +290,8 @@ Definition spec_secp256k1_foo : ident * funspec :=
   type per line, trailing comma, aligned under the first.
 - `WITH` binders wrap at a sensible width with the continuation aligned.
 - Spatial resources use the `*_at` notations (`u128_at`, `scalar_at`, `fe_at`,
-  `signed62_at`, `modinfo_at`, ...) from `contract/helper/notations.v` (and
-  `contract/helper/signed62.v` for the modinv structs), never raw `data_at` --
+  `signed62_at`, `modinfo_at`, ...) from `vst/helper/notations.v` (and
+  `vst/helper/signed62.v` for the modinv structs), never raw `data_at` --
   except where no notation fits the value shape (e.g. the `pad`-based and
   `trans2x2` resources, or uninitialised `data_at_`).
 - Empty clauses are `PROP ()` / `RETURN ()`.
@@ -261,36 +314,36 @@ The automation layer lives under `tactics/`. Prefer it over hand-rolled
 patterns:
 
 - **`rep_lia` over `lia`** for goals involving `UInt64` / `UInt128` / `Acc`
-  values. The `rep_lia_setup2` hook (in `tactics/core.v`) auto-poses the
+  values. The `rep_lia_setup2` hook (in `vst/tactics/core.v`) auto-poses the
   carried range fact for every `u64_val ?x`, `u128_val ?x`, `acc_val ?x`,
   `u256_val ?x` in the goal, eliminating manual
   `pose proof (u64_range x)` calls. There is exactly ONE `rep_lia_setup2 ::=`
   override in the project; extend it there, never re-override elsewhere.
-- **`forward_call_*` wrappers**, declared per subsystem (`tactics/int128.v`,
-  `tactics/scalar.v`, ...), bundle each `forward_call` with `Intros`,
+- **`forward_call_*` wrappers**, declared per subsystem (`vst/tactics/int128.v`,
+  `vst/tactics/scalar.v`, ...), bundle each `forward_call` with `Intros`,
   `rename H`, optional `destruct`, and `deadvars!`. They auto-discharge the
   parameter-matching obligation via `solve_param_match` (which rewrites with
   the `to_val_limb` Hint database) and the linear PROP via
   `try (simpl; rep_lia)`. Use them in preference to raw
   `forward_call (...) ; Intros ...`.
 - **Constants**: use `N_C_0_u64`, `N_C_1_u64`, `N_C_2_u64` (declared in
-  `tactics/scalar.v`), not the verbose `mkUInt64 N_C_i N_C_i_range`. They
+  `vst/tactics/scalar.v`), not the verbose `mkUInt64 N_C_i N_C_i_range`. They
   are registered with `Hint Rewrite` in the `rep_lia` database so
   `u64_val N_C_i_u64` reduces automatically.
-- **Limbs**: use the generic `limb (2^64) v i` from `theory/arithmetic.v`.
+- **Limbs**: use the generic `limb (2^64) v i` from `theory/integers/arithmetic.v`.
   The C-representation definitions (`uint128_to_val`, `acc_to_val`,
-  `uint256_to_val`, `uint512_to_val` in `contract/helper/repr.v`) use
+  `uint256_to_val`, `uint512_to_val` in `vst/helper/repr.v`) use
   **inline splits** `(v / 2^k) mod 2^64` in their bodies, matching the spec
   style. Bridge lemmas `uint128/acc/uint256/uint512_to_val_limb` (registered
   with `Hint Rewrite ... : to_val_limb`) equate the inline form to
   `limb (2^64) v i`, so proofs can convert with `autorewrite with to_val_limb`.
-- **`limb_at_0` lemma** (`theory/bits.v`): rewrites `limb (2^64) v 0` back to
+- **`limb_at_0` lemma** (`theory/integers/bits.v`): rewrites `limb (2^64) v 0` back to
   `v mod 2^64`. Use `rewrite ?limb_at_0` in proofs that prefer the mod form.
 - **`Hint Rewrite ... : rep_lia`** is the registry for any lemma that
   `rep_lia` should auto-apply (e.g. constant unfoldings, projector
   reductions, limb-of-known-value identities). The registrations live next
   to the definitions they unfold (e.g. `secp256k1_N_val` in
-  `model/constants.v`); the database is string-keyed and merges at use site.
+  `specification.v`); the database is string-keyed and merges at use site.
 - **modinv (safegcd) proofs use the same layer as every other subsystem** --
   there is no subsystem-specific search automation. `rep_lia` and its
   `Hint Rewrite` registries close the linear side goals; the
@@ -302,7 +355,7 @@ patterns:
   `smul64_bounds_tight`, `unadd_bounds_*`, ...) close with a direct
   `apply <lemma>; lia`. See "Banned in verif/" below for what replaced the
   old vendored search tactics.
-- **Shift/pow-heavy proofs**: `Require Import secp256k1.tactics.hygiene`
+- **Shift/pow-heavy proofs**: `Require Import secp256k1.vst.tactics.hygiene`
   LAST sets `Arguments ... : simpl never` and `#[global] Opaque` for
   `Z.shiftl` / `Z.shiftr` / `Z.pow`, so `forward` does not diverge unfolding
   `Int64.Z_mod_modulus` under a shift. A bare `Opaque` does not survive a
@@ -327,7 +380,7 @@ one expands to a short, explicit step written out at the call site:
 | `fastforward N` / `do N forward` | `N` commented `forward`s, one per C statement |
 | `2:{ }` / `all:` / a multi-line `[ | ]` | `{ }` + bullets, or a hoisted named `assert` |
 | `match goal with [H : ...] => rename ... end` | `rename H into ...`, after naming the PROP hypotheses up front from `Intros` |
-| an inline `Opaque` / `Transparent` | `Require Import secp256k1.tactics.hygiene` last; ground a concrete identity with `vm_compute` instead of un-opacifying |
+| an inline `Opaque` / `Transparent` | `Require Import secp256k1.vst.tactics.hygiene` last; ground a concrete identity with `vm_compute` instead of un-opacifying |
 | `clearbody` / `set ... in *` / `rewrite ?... in *` as a speed crutch | allowed only with a one-line comment giving the measured with/without time |
 
 ## Vendored theory exception
@@ -346,22 +399,23 @@ is a resync-with-upstream decision, not a style fix.
 ## File and directory naming
 
 - Every directory and file under `proof/` is `lower_snake_case`
-  (`contract/helper/structs_modinv.v`,
-  `verif/modinv/impl/modinv64_normalize_62.v`).
+  (`vst/helper/structs_modinv.v`,
+  `vst/modinv/verif/impl/modinv64_normalize_62.v`).
 - `verif/` is one `semax_body` per file, named for the C function it proves
   with the `secp256k1_` prefix dropped when that leaves the name unambiguous
-  (`verif/scalar/scalar_add.v` proves `secp256k1_scalar_add`;
-  `verif/util/ctz64_var_debruijn.v` proves `secp256k1_ctz64_var_debruijn`).
+  (`vst/scalar/verif/scalar_add.v` proves `secp256k1_scalar_add`;
+  `vst/util/verif/ctz64_var_debruijn.v` proves `secp256k1_ctz64_var_debruijn`).
   The lemma inside keeps the full C name: `body_secp256k1_scalar_add`.
 - `impl/` under a subsystem directory holds the `static` (internal-linkage)
   helpers that module's C code calls but does not export
-  (`verif/scalar/impl/`, `verif/modinv/impl/`, `verif/int128/impl/`),
+  (`vst/scalar/verif/impl/`, `vst/modinv/verif/impl/`, `vst/int128/verif/impl/`),
   mirroring the split between a header's public API and its `.c`-local
   helpers.
 - Subsystem directories (`field/`, `int128/`, `modinv/`, `scalar/`, `util/`)
   mirror the `src/` module they verify, and carry the same name across
-  `theory/<sub>/`, `contract/gprog/<sub>.v`, `tactics/<sub>.v`, and
-  `verif/<sub>/`.
+  `theory/<sub>/` and `vst/<sub>/`. A subsystem gets a `vst/tactics/<sub>.v`
+  only when it has reusable Ltac of its own, so that file does not exist for
+  every subsystem.
 
 ## Lemma-name suffixes (project artifacts)
 
@@ -373,26 +427,34 @@ has a small set of fixed names for what layer/role an artifact plays:
 | `_eq` | a definitional / reflective equality |
 | `_bound` / `_bnd` | a numeric interval fact (`0 <= x < 2^64`) |
 | `_repr` | an `Int64.repr` / `Int.repr` representation bridge |
-| `<name>_at` | a spatial (`SEP`) predicate notation, e.g. `u64_at`, `signed62_at`, `modinfo_at` (declared in `contract/helper/notations.v` or the subsystem's own contract file) |
+| `<name>_at` | a spatial (`SEP`) predicate notation, e.g. `u64_at`, `signed62_at`, `modinfo_at` (declared in `vst/helper/notations.v` or the subsystem's own contract file) |
 | `body_secp256k1_<fn>` | the `semax_body` lemma proving `secp256k1_<fn>`'s contract |
 | `spec_secp256k1_<fn>` | the `funspec` (`DECLARE`) for `secp256k1_<fn>` |
-| `Gprog_<sub>` | the per-subsystem `Gprog` list bound in `contract/gprog/<sub>.v` |
+| `Gprog_<sub>_public` / `Gprog_<sub>_impl` | the module's own funspec list, bound at the bottom of `vst/<sub>/contract.v` / `vst/<sub>/impl.v`; `vst/gprog.v` concatenates them into the one global `Gprog` |
 
 ## Where a lemma goes
 
-- Pure `Z` fact with no VST/CompCert content -> `theory/` (generic core at
-  the root; a per-subsystem fact goes in `theory/<sub>/`).
-- A fact about the pure functional specification -> `model/` (purity-gated:
-  no `VST.*` / `compcert.*` / `secp256k1.clight` / `secp256k1.vst` imports).
+- Pure `Z` limb/bit/interval fact with no VST/CompCert content, and no
+  mathematical content a reviewer of the claim needs -> `theory/`
+  (generic core at the root; a per-subsystem fact goes in
+  `theory/<sub>/`).
+- A mathematical interface definition and the proofs about it belong in
+  `specification.v`, inside the pure `Math` module. A C algorithm model,
+  such as the comb, ladder or safegcd construction, belongs under
+  `theory/`.
+- A known-answer test belongs in `vectors/`, built by `make vectors`.
+  Keep each BIP340 vector in its own file with its literals and lemmas.
+  These computational tests are separate from `make proof` because scalar
+  multiplication is slow under `vm_compute`.
 - A CompCert/VST word-level bridge with no funspec content (an `Int64.repr`
   identity, a mask/shift lemma) -> `vst/` (e.g. `vst/integers.v`).
 - A representation predicate, a funspec, or a fact that exists only to
-  discharge one -> `contract/` (`contract/<sub>.v` for the funspec + `_at`
-  bridges, `contract/helper/` for the cross-subsystem plumbing frozen there,
-  `contract/impl/` for a `static` helper's contract).
-- Reusable Ltac -> `tactics/<sub>.v` (or `tactics/core.v` if it is
+  discharge one -> `vst/<sub>/contract.v` for a public funspec + its `_at`
+  bridges, `vst/<sub>/impl.v` for a `static` helper's contract, and
+  `vst/helper/` for the cross-subsystem plumbing frozen there.
+- Reusable Ltac -> `vst/tactics/<sub>.v` (or `vst/tactics/core.v` if it is
   subsystem-free).
-- A `verif/` file holds ONLY its own body proof and the facts it uses
+- A `vst/<sub>/verif/` file holds ONLY its own body proof and the facts it uses
   exactly once. The moment a fact is needed by a second proof, hoist it to
   the layer above -- do not `Require` one verif file from another.
 
@@ -418,11 +480,11 @@ dropping it on restyle:
     SPDX-License-Identifier: MIT *)
 ```
 
-The whole tree is MIT under the repository root's `COPYING`; the SPDX line
-says so even in a ported file. The attribution block names the upstream
-copyright holder rather than the individual authors, because the holder is
-who the upstream licence names. Never delete it when restyling a ported file
-to house style. Continuation lines of the Copyright/attribution block are
+The proof tree is licensed the same way the library it verifies is: MIT,
+under the repository root's `COPYING`. A ported file names the upstream
+holder, not the individual authors, because that is who the upstream licence
+names. Never delete the attribution block when restyling a ported file to
+house style. Continuation lines of the Copyright/attribution block are
 indented 4 spaces to align under the text.
 
 MIT requires the upstream copyright notice and permission notice to travel
@@ -445,63 +507,9 @@ vendoring, and lives in its ordinary layer directory, not under `deps/`.
 Nothing in the tree currently needs this tier; it is here so the next
 wholesale drop has a home decided in advance.
 
-## Gates
+## Axiom check
 
-`audit/check.sh` is the mechanical honesty gate, seven checks:
-
-0. Build freshness -- every file listed in `_RocqProject` has an up-to-date
-   `.vo`. `model/tests_slow_*.v` are exempted from the "every layer `.v` is
-   tracked in `_RocqProject`" half of this check, the same way
-   `audit/assumptions.v` is: they are the slow curve KATs, deliberately kept
-   out of `_RocqProject` because each one costs 10 to 50 minutes under
-   `vm_compute` (built on request via `make model-tests`, never by `make
-   proof` / `make audit`). The gate's OK/FAIL line reports how many files
-   that exemption covered.
-0b. AST fingerprint -- `clight/extraction.v` matches the pinned
-    `audit/extraction.sha256`, so a silent re-extraction cannot swap the AST
-    the proofs are checked against.
-1. Proof gaps -- no `Admitted.` / `admit.` / `give_up.` anywhere under
-   `proof/` except the register of scaffolded
-   `model/` lemmas in `audit/scaffold.txt` (one `path:lemma` per line). The
-   gate is a two-way match: every `Admitted.` site outside the sanctioned
-   carve-out must have a `scaffold.txt` line naming its file and its nearest
-   preceding `Lemma`/`Theorem`/`Corollary`, and every `scaffold.txt` line must
-   name a real `Admitted.` site -- a stale entry (one whose lemma has since
-   been proved or renamed) fails the gate exactly like an unregistered gap
-   does. `scaffold.txt`'s first line may be a `# count: N` ratchet comment;
-   when present it must equal the file's actual entry count. The gate prints
-   the registered count per file.
-2. Axiom confinement -- every top-level `Axiom`, `Parameter`, and section
-   `Hypothesis` under `proof/` is confined to the files on the gate's
-   explicit allowlist; today that is
-   `theory/modinv/divsteps/{bound724,bound590}.v` (`example724` /
-   `example590`) plus `model/tables.v` (the three precomputed-table
-   `Parameter`s and their nine characterisation `Axiom`s) -- see
-   `audit/AXIOM_WHITELIST`. (`model/constants.v`'s `secp256k1_N_prime` used
-   to be a fourth allowed file; it is now a `Qed` lemma, discharged by a
-   coqprime Pocklington certificate in `theory/primality/n.v`, so it no
-   longer declares an `Axiom` at all.) Every name `model/tables.v` declares
-   must also appear in `audit/scaffold.axioms` (one name per line, no
-   comments needed); the gate prints `model/tables.v`'s Parameter/Axiom
-   counts. `scaffold.axioms` is a source-side name-completeness ratchet only
-   -- it is NOT consulted by gate 4, and its names are not whitelisted there
-   until some body proof's assumption cone actually depends on one of them
-   (a separate, reviewed `audit/AXIOM_WHITELIST` edit at that time).
-3. Headline pin -- a statement file under `audit/` (`statement`, added with
-   the reviewer-facing headline) probes the audited theorem(s) by name and
-   pasted type, so a silent rename or a swap for a weaker namesake fails the
-   build rather than passing quietly (reported as SKIP until that file exists).
-4. Assumption cone vs whitelist -- `Print Assumptions` on
-   `audit/assumptions.v`'s `verified_surface` must stay within
-   `audit/AXIOM_WHITELIST`.
-5. Style greps -- some of this document's mechanically-checkable rules
-   (ASCII-only, the license header shape, the banned-tactic table above)
-   enforced by grep, including sub-check 5h: `grep -rn 'contract\.gprog'
-   tactics/` must be empty -- a tactics file may never import a proving
-   context (see "Where a lemma goes").
-
-`make audit` runs all seven. `make axioms` runs the model/theory purity check
-plus gate 4 alone (the narrower check this project has always run before a
-commit). `make style` runs gate 5 alone. `make model-tests` compiles the slow
-`model/tests_slow_*.v` KATs one at a time (10 to 50 minutes each) -- it is
-separate from both `proof` and `audit`.
+`make axioms` builds the project and reports assumptions from every module
+listed in `_RocqProject` and its imports without rechecking compiled proofs.
+Review the reported axioms and admitted proofs. The style rules in this
+document are manual guidance, not a separate automated target.

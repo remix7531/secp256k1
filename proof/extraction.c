@@ -1,26 +1,4 @@
-/* Extraction unit for formal verification.
- *
- * Pulls in the library's real scalar arithmetic (scalar_impl.h), the struct-based
- * 128-bit helpers (int128_impl.h), the safegcd modular inverse (modinv64_impl.h),
- * and the 5x52 field (field_impl.h), compiled with
- * -DUSE_FORCE_WIDEMUL_INT128_STRUCT=1 and no assembly, so the unit is the pure-C
- * form clightgen accepts. Nothing is copied: the proofs reason about exactly the
- * code that ships. This is the single VERIFY-off AST for the whole proof tree; the
- * VERIFY_CHECK asserts and the verify-only helpers are absent here.
- *
- * Taking a function's address forces clightgen to retain it AND its whole call
- * graph; every primitive has internal linkage and would otherwise be pruned as
- * unused. extraction_targets[] below lists the call-graph roots. See Makefile.
- *
- * Extern-tables convention (decided ahead of the ecmult work): the precomputed
- * point tables (precomputed_ecmult*.c, ~2.4 MB of static initializers) must
- * NEVER be #included here -- they would reify into a multi-megabyte AST that
- * every proof file loads. When ecmult lands, this unit sees the tables as
- * `extern` declarations only (bare global variables, type but no initializer);
- * the table CONTENTS live in a second extraction unit (clight/tables.v, see
- * EXTRACT_SRCS in the Makefile) consumed by exactly one bridge file, with the
- * odd-multiples-of-G characterization proved by reflection over the group
- * model rather than axiomatized. */
+/* Extract the implementation, Schnorr API, and production precomputed tables. */
 
 #define SECP256K1_BUILD
 
@@ -54,15 +32,16 @@
 #undef SECP256K1_SCALAR_VERIFY
 #define SECP256K1_SCALAR_VERIFY(r)
 
-#include "scalar_impl.h"
-#include "int128_impl.h"
-#include "modinv64_impl.h"
-#include "field_impl.h"
+#define ENABLE_MODULE_EXTRAKEYS
+#define ENABLE_MODULE_SCHNORRSIG
+#include "../src/secp256k1.c"
+#include "../src/precomputed_ecmult.c"
+#include "../src/precomputed_ecmult_gen.c"
 
 /* Listing a function's address forces clightgen to emit it AND its whole call
  * graph, so to verify a function add its address below (no need to list helpers it
- * already calls). Grouped by subsystem in the same order as audit/assumptions.v and
- * the verif/ tree: field, int128, modinv, scalar. util has no roots of its own
+ * already calls). Grouped by subsystem: field, int128, modinv, scalar.
+ * util has no roots of its own
  * (read_be64 / write_be64 / ctz64_var / memzero are pulled in transitively). */
 const void * const extraction_targets[] = {
     /* field.h: the 5x52 (base 2^52) field. VERIFY-off, so secp256k1_fe_add is
@@ -101,12 +80,6 @@ const void * const extraction_targets[] = {
      * det_check_pow2) are NOT in this AST. */
     (const void *)&secp256k1_modinv64_var,
 
-    /* modinv64.h: the Jacobi symbol (safegcd variant). EXTRACTED, but its body proof
-     * is OUTSTANDING (an Admitted lemma, NOT a trusted axiom): off the Schnorr path
-     * and research-grade. Listed so the gap is EXPLICIT; deliberately NOT part of
-     * the audited verified_surface. */
-    (const void *)&secp256k1_jacobi64_maybe_var,
-
     /* scalar.h: the whole public scalar API, plus the modular inverse and the
      * scalar<->signed62 converters. secp256k1_scalar_inverse retains the
      * constant-time driver secp256k1_modinv64 (divsteps_59 + the helpers shared with
@@ -138,5 +111,12 @@ const void * const extraction_targets[] = {
     (const void *)&secp256k1_scalar_to_signed62,
     (const void *)&secp256k1_scalar_from_signed62,
     (const void *)&secp256k1_scalar_inverse_var,
-    (const void *)&secp256k1_scalar_inverse
+    (const void *)&secp256k1_scalar_inverse,
+
+    (const void *)&secp256k1_keypair_create,
+    (const void *)&secp256k1_keypair_xonly_pub,
+    (const void *)&secp256k1_xonly_pubkey_parse,
+    (const void *)&secp256k1_xonly_pubkey_serialize,
+    (const void *)&secp256k1_schnorrsig_sign32,
+    (const void *)&secp256k1_schnorrsig_verify
 };
