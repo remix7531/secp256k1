@@ -8,6 +8,8 @@ High-performance high-assurance C library for digital signatures and other crypt
 
 This library is intended to be the highest quality publicly available library for cryptography on the secp256k1 curve. However, the primary focus of its development has been for usage in the Bitcoin system and usage unlike Bitcoin's may be less well tested, verified, or suffer from a less well thought out interface. Correct usage requires some care and consideration that the library is fit for your application's purpose.
 
+This branch develops Rocq specifications and VST proofs for libsecp256k1. See the [proof documentation](proof/README.md) for build instructions, source layout and assumptions.
+
 Features:
 * secp256k1 ECDSA signing/verification and key generation.
 * Additive and multiplicative tweaking of secret/public keys.

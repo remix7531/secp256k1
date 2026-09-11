@@ -1,49 +1,31 @@
-# IMPORTANT: keep the -Q / -arg directives below contiguous at the TOP, before
-# any '#' comment.  coq-lsp stops collecting flags at the first comment, so a
-# comment between directives makes the editor drop every later directive (make
-# and clightgen read the whole file regardless).  One flat `secp256k1` namespace.
+# Keep editor directives contiguous.
 -Q . secp256k1
 -arg -w -arg -deprecated-from-Coq
 -arg -w -arg -deprecated-missing-stdlib
 
-# The extraction AST (clightgen output, git-ignored).
+# Generated Clight extraction.
 clight/extraction.v
 
-# vst/ -- VST/CompCert glue over the AST: floyd re-export + CompSpecs/Vprog,
-#   generic separation-logic helpers.  Toolchain glue only, zero trusted content.
-vst/base.v
+# VST setup.
 vst/array_data_at.v
-vst/integers.v
+vst/base.v
 vst/composites.v
+vst/integers.v
 
-# theory/ -- generic Z / limb / bit math (VST-free), per-subsystem subdirs.
-#   Generic core at the root; extra_math.v is frozen vendored MIT.
-theory/arithmetic.v
-theory/limb_window.v
-theory/bits.v
-theory/bytes.v
-theory/extra_math.v
+# Integer arithmetic and safegcd lemmas.
+theory/integers/arithmetic.v
+theory/integers/bits.v
+theory/integers/extra_math.v
+theory/field/bits.v
+theory/integers/limb_window.v
 theory/modinv/bounds.v
-
-# theory/hash/ -- hash-subsystem math (32-bit word bit ops for SHA-256).
-theory/hash/sha256_bits.v
-
-# theory/field/ -- field-subsystem math.
-theory/field/field_bits.v
-
-# theory/scalar/ -- scalar-subsystem math.
-theory/scalar/glv.v
-
-# theory/modinv/ -- the safegcd umbrella.
-#   construction/ is the gcd/divstep construction (MIT-ported from simplicity);
-#   divsteps/ is the vendored safegcd-bounds convergence library (MIT).
 theory/modinv/construction/bezout.v
-theory/modinv/construction/inverse.v
-theory/modinv/construction/divstep.v
 theory/modinv/construction/divstep_trans.v
-theory/modinv/construction/posdivstep.v
-theory/modinv/construction/posdivstep_trans.v
+theory/modinv/construction/divstep.v
 theory/modinv/construction/divstep_zeta.v
+theory/modinv/construction/inverse.v
+theory/modinv/construction/posdivstep_trans.v
+theory/modinv/construction/posdivstep.v
 theory/modinv/divsteps/base.v
 theory/modinv/divsteps/bound590.v
 theory/modinv/divsteps/bound724.v
@@ -55,150 +37,135 @@ theory/modinv/divsteps/orient.v
 theory/modinv/divsteps/qq.v
 theory/modinv/divsteps/sound.v
 theory/modinv/divsteps/theory.v
+theory/scalar/glv.v
 
-# theory/primality/ -- a coqprime Pocklington certificate for the group
-#   order, additive to model/constants.v's Axiom (see secp256k1_fv.v).
-theory/primality/n.v
-theory/primality/p.v
+# Machine integer model.
+theory/integers/machine.v
 
-# model/ -- the pure functional spec (the trust boundary).
-model/constants.v
-model/types.v
-model/field.v
-model/group.v
-model/group_ell.v
-model/group_law.v
-model/group_order.v
-model/int128.v
-model/acc.v
-model/modinv.v
-model/jacobi_rules.v
-model/scalar.v
-model/hash.v
-model/tables.v
-model/ecmult_gen.v
-model/ecmult.v
-model/bip340.v
-model/tests.v
-model/tests_hash.v
-model/tests_field.v
-model/tests_group.v
-model/tests_ecmult.v
-model/tests_ecmult_gen.v
-model/tests_bip340.v
+# Public mathematics and API contracts.
+specification.v
 
-# contract/ -- representation predicates, funspecs, and the global Gprog.
-#   modinv contracts + helper/signed62 are vendored from simplicity (MIT).
-contract/field.v
-contract/gprog/all.v
-contract/gprog/field.v
-contract/gprog/int128.v
-contract/gprog/jacobi.v
-contract/gprog/modinv.v
-contract/gprog/scalar.v
-contract/gprog/util.v
-contract/helper/notations.v
-contract/helper/repr.v
-contract/helper/signed62.v
-contract/helper/structs_field.v
-contract/helper/structs_int128.v
-contract/helper/structs_modinv.v
-contract/helper/structs_scalar.v
-contract/impl/int128.v
-contract/impl/modinv.v
-contract/impl/scalar.v
-contract/int128.v
-contract/jacobi.v
-contract/modinv.v
-contract/scalar.v
-contract/util.v
+theory/scalar/limbs.v
+theory/int128/acc.v
+theory/ecmult/ecmult_gen.v
+theory/ecmult/ecmult.v
+theory/int128/int128.v
+theory/modinv/jacobi_rules.v
+theory/modinv/modinv.v
+theory/ecmult/tables.v
 
-# tactics/ -- proof automation: generic core + one file per subsystem.
-#   modinv.v is the vendored MIT progressC port.
-tactics/core.v
-tactics/int128.v
-tactics/scalar.v
-tactics/field.v
-tactics/hygiene.v
 
-# verif/ -- body proofs for the verified surface.
-verif/field/fe_add.v
-verif/int128/i128_accum_mul.v
-verif/int128/i128_check_pow2.v
-verif/int128/i128_det.v
-verif/int128/i128_eq_var.v
-verif/int128/i128_from_i64.v
-verif/int128/i128_load.v
-verif/int128/i128_mul.v
-verif/int128/i128_rshift.v
-verif/int128/i128_to_i64.v
-verif/int128/i128_to_u64.v
-verif/int128/impl/i128_dissip_mul.v
-verif/int128/impl/mul128.v
-verif/int128/impl/umul128.v
-verif/int128/u128_accum_mul.v
-verif/int128/u128_accum_u64.v
-verif/int128/u128_check_bits.v
-verif/int128/u128_from_u64.v
-verif/int128/u128_hi_u64.v
-verif/int128/u128_load.v
-verif/int128/u128_mul.v
-verif/int128/u128_rshift.v
-verif/int128/u128_to_u64.v
-verif/modinv/impl/modinv64_divsteps_59.v
-verif/modinv/impl/modinv64_divsteps_62_var.v
-verif/modinv/impl/modinv64_normalize_62.v
-verif/modinv/impl/modinv64_signed62_assign.v
-verif/modinv/impl/modinv64_update_de_62.v
-verif/modinv/impl/modinv64_update_de_limb.v
-verif/modinv/impl/modinv64_update_fg_62.v
-verif/modinv/impl/modinv64_update_fg_62_var.v
-verif/modinv/modinv64.v
-verif/modinv/modinv64_var.v
-verif/scalar/get_bits_limb32.v
-verif/scalar/get_bits_var.v
-verif/scalar/impl/scalar_check_overflow.v
-verif/scalar/impl/scalar_extract.v
-verif/scalar/impl/scalar_extract_fast.v
-verif/scalar/impl/scalar_from_signed62.v
-verif/scalar/impl/scalar_mul_512.v
-verif/scalar/impl/scalar_muladd.v
-verif/scalar/impl/scalar_muladd_fast.v
-verif/scalar/impl/scalar_reduce.v
-verif/scalar/impl/scalar_reduce_512.v
-verif/scalar/impl/scalar_shift_limb.v
-verif/scalar/impl/scalar_sumadd.v
-verif/scalar/impl/scalar_sumadd_fast.v
-verif/scalar/impl/scalar_to_signed62.v
-verif/scalar/scalar_add.v
-verif/scalar/scalar_cadd_bit.v
-verif/scalar/scalar_clear.v
-verif/scalar/scalar_cmov.v
-verif/scalar/scalar_cond_negate.v
-verif/scalar/scalar_eq.v
-verif/scalar/scalar_get_b32.v
-verif/scalar/scalar_half.v
-verif/scalar/scalar_inverse.v
-verif/scalar/scalar_inverse_var.v
-verif/scalar/scalar_is_even.v
-verif/scalar/scalar_is_high.v
-verif/scalar/scalar_is_one.v
-verif/scalar/scalar_is_zero.v
-verif/scalar/scalar_mul.v
-verif/scalar/scalar_mul_shift_var.v
-verif/scalar/scalar_negate.v
-verif/scalar/scalar_set_b32.v
-verif/scalar/scalar_set_b32_seckey.v
-verif/scalar/scalar_set_int.v
-verif/scalar/scalar_split_128.v
-verif/scalar/scalar_split_lambda.v
-verif/scalar/scalar_verify.v
-verif/util/ctz64_var.v
-verif/util/ctz64_var_debruijn.v
-verif/util/memclear_explicit.v
-verif/util/memzero_explicit.v
-verif/util/read_be64.v
-verif/util/write_be64.v
+# C contracts and representation predicates.
+vst/field/contract.v
+vst/helper/notations.v
+vst/helper/repr.v
+vst/helper/signed62.v
+vst/helper/structs_field.v
+vst/helper/structs_group.v
+vst/helper/structs_int128.v
+vst/helper/structs_modinv.v
+vst/helper/structs_scalar.v
+vst/int128/contract.v
+vst/int128/impl.v
+vst/modinv/contract.v
+vst/modinv/impl.v
+vst/scalar/contract.v
+vst/scalar/impl.v
+vst/util/contract.v
+vst/gprog.v
 
-# secp256k1_fv.v -- the reviewer-facing headline (audit/statement.v pins it).
-secp256k1_fv.v
+# Contracts for the full extraction.
+vst/scaffold.v
+vst/ecmult/contract.v
+vst/group/contract.v
+vst/hash/contract.v
+
+# Proof automation.
+vst/tactics/core.v
+vst/tactics/field.v
+vst/tactics/hygiene.v
+vst/tactics/int128.v
+vst/tactics/scalar.v
+
+# Function body proofs.
+vst/field/verif/fe_add.v
+vst/int128/verif/i128_accum_mul.v
+vst/int128/verif/i128_check_pow2.v
+vst/int128/verif/i128_det.v
+vst/int128/verif/i128_eq_var.v
+vst/int128/verif/i128_from_i64.v
+vst/int128/verif/i128_load.v
+vst/int128/verif/i128_mul.v
+vst/int128/verif/i128_rshift.v
+vst/int128/verif/i128_to_i64.v
+vst/int128/verif/i128_to_u64.v
+vst/int128/verif/impl/i128_dissip_mul.v
+vst/int128/verif/impl/mul128.v
+vst/int128/verif/impl/umul128.v
+vst/int128/verif/u128_accum_mul.v
+vst/int128/verif/u128_accum_u64.v
+vst/int128/verif/u128_check_bits.v
+vst/int128/verif/u128_from_u64.v
+vst/int128/verif/u128_hi_u64.v
+vst/int128/verif/u128_load.v
+vst/int128/verif/u128_mul.v
+vst/int128/verif/u128_rshift.v
+vst/int128/verif/u128_to_u64.v
+vst/modinv/verif/impl/modinv64_divsteps_59.v
+vst/modinv/verif/impl/modinv64_divsteps_62_var.v
+vst/modinv/verif/impl/modinv64_normalize_62.v
+vst/modinv/verif/impl/modinv64_signed62_assign.v
+vst/modinv/verif/impl/modinv64_update_de_62.v
+vst/modinv/verif/impl/modinv64_update_de_limb.v
+vst/modinv/verif/impl/modinv64_update_fg_62.v
+vst/modinv/verif/impl/modinv64_update_fg_62_var.v
+vst/modinv/verif/modinv64.v
+vst/modinv/verif/modinv64_var.v
+vst/scalar/verif/get_bits_limb32.v
+vst/scalar/verif/get_bits_var.v
+vst/scalar/verif/impl/scalar_check_overflow.v
+vst/scalar/verif/impl/scalar_extract.v
+vst/scalar/verif/impl/scalar_extract_fast.v
+vst/scalar/verif/impl/scalar_from_signed62.v
+vst/scalar/verif/impl/scalar_mul_512.v
+vst/scalar/verif/impl/scalar_muladd.v
+vst/scalar/verif/impl/scalar_muladd_fast.v
+vst/scalar/verif/impl/scalar_reduce.v
+vst/scalar/verif/impl/scalar_reduce_512.v
+vst/scalar/verif/impl/scalar_shift_limb.v
+vst/scalar/verif/impl/scalar_sumadd.v
+vst/scalar/verif/impl/scalar_sumadd_fast.v
+vst/scalar/verif/impl/scalar_to_signed62.v
+vst/scalar/verif/scalar_add.v
+vst/scalar/verif/scalar_cadd_bit.v
+vst/scalar/verif/scalar_clear.v
+vst/scalar/verif/scalar_cmov.v
+vst/scalar/verif/scalar_cond_negate.v
+vst/scalar/verif/scalar_eq.v
+vst/scalar/verif/scalar_get_b32.v
+vst/scalar/verif/scalar_half.v
+vst/scalar/verif/scalar_inverse.v
+vst/scalar/verif/scalar_inverse_var.v
+vst/scalar/verif/scalar_is_even.v
+vst/scalar/verif/scalar_is_high.v
+vst/scalar/verif/scalar_is_one.v
+vst/scalar/verif/scalar_is_zero.v
+vst/scalar/verif/scalar_mul.v
+vst/scalar/verif/scalar_mul_shift_var.v
+vst/scalar/verif/scalar_negate.v
+vst/scalar/verif/scalar_set_b32.v
+vst/scalar/verif/scalar_set_b32_seckey.v
+vst/scalar/verif/scalar_set_int.v
+vst/scalar/verif/scalar_split_128.v
+vst/scalar/verif/scalar_split_lambda.v
+vst/scalar/verif/scalar_verify.v
+vst/util/verif/ctz64_var.v
+vst/util/verif/ctz64_var_debruijn.v
+vst/util/verif/memclear_explicit.v
+vst/util/verif/memzero_explicit.v
+vst/util/verif/read_be64.v
+vst/util/verif/write_be64.v
+vst/ecmult/verif/ecmult_gen_ge.v
+vst/field/verif/fe_mul.v
+vst/group/verif/gej_add_ge.v
+vst/hash/verif/sha256_write.v

@@ -20,7 +20,7 @@ Require Import Lia.
 Require Import List.
 
 Require Import secp256k1.theory.modinv.divsteps.def.
-Require Import secp256k1.theory.extra_math.
+Require Import secp256k1.theory.integers.extra_math.
 Require Import secp256k1.theory.modinv.construction.inverse.
 Require Import secp256k1.theory.modinv.construction.divstep.
 

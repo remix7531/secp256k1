@@ -21,6 +21,5 @@ Require Import secp256k1.theory.modinv.divsteps.base.
    proves it by [vm_cast_no_check] reflection; we keep it an [Axiom] because the
    724-iteration check over a 256-bit modulus is computationally scale-blocked
    (~k^4: 2.6 s at 50 iterations, 43 s at 100, multi-day at 724), not
-   tactic-blocked ([vm_compute] works on Rocq 9.0.1).  One of three assumed axioms
-   (with [example590] and [secp256k1_N_prime]); upstream assumes it too. *)
+   tactic-blocked ([vm_compute] works on Rocq 9.0.1). *)
 Axiom example724 : ZMap.Empty (N.iter 724 (process_divstep 0x1030596cf6d817d1357f908ef70cdb00b38d047fbba852139babb6c8646fb15b2) state0).
