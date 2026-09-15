@@ -30,6 +30,11 @@ makes them slow. `make clean` removes proof artifacts and HTML, preserving
 `clight/` and the arithmetic tactic caches. `make purge` also removes
 those retained files.
 
+Every build prints one timing line per file and writes per-command times
+to `<file>.v.timing`. Pass `TIMED=` or `TIMING=` to disable either.
+`python3 doc/critical_path.py` combines those times with the dependency
+graph and prints the chain of files that bounds parallel build time.
+
 ## Read the proof
 
 Start with `specification.v`, or its rendered version at

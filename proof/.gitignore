@@ -16,5 +16,13 @@ Makefile.rocq.conf
 .Makefile.rocq.d
 .axioms/
 
+# timing data (TIMED=1 / TIMING=1 defaults, make pretty-timed)
+*.v.timing
+*.v.before-timing
+*.v.after-timing
+*.v.timing.diff
+time-of-build*.log
+pretty-timed-success.ok
+
 # coqdoc rendering of the story files (make html)
 html/
