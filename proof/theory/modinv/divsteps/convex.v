@@ -43,8 +43,8 @@ exists l : list (Q * DD),
 Lemma in_convex_hull_Empty : forall {x}, ~in_convex_hull x DDSet.empty.
 Proof.
   intros s [[|[q d]] [H0 [H1 [H2 H3]]]]; [discriminate|].
-  destruct (H0 q d); auto with *.
-  auto using (@DDSet.empty_spec d).
+  destruct (H0 q d) as [_ Hin]; auto with *.
+  exact (@DDSet.empty_spec d Hin).
 Qed.
 
 (** Hull membership respects rational-pair equality of the point. *)
