@@ -1,6 +1,15 @@
 {
   description = "secp256k1 formal verification dev shell - Rocq + VST + CompCert";
 
+  # CompCert is unfree, so Hydra never builds it and neither it nor VST
+  # reaches cache.nixos.org. coq-community publishes both.
+  nixConfig = {
+    extra-substituters = [ "https://coq-community.cachix.org" ];
+    extra-trusted-public-keys = [
+      "coq-community.cachix.org-1:WBDHojv8FM6nI4ZMh43X+2g6j4WpAn+dFhjhWmLCgnA="
+    ];
+  };
+
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/9720717206e5c0e3ad3065dadb23f46506eb5a9d";
     flake-utils.url = "github:numtide/flake-utils";
@@ -23,42 +32,48 @@
         };
 
         coqPkgs = pkgs.coqPackages_9_0;
-      in {
-        devShells.default = pkgs.mkShell {
+
+        # What the proof targets need, and nothing more: gcc for clightgen's
+        # preprocessing, GNU time for the default TIMED mode.
+        buildPackages = (with coqPkgs; [
+          VST
+          compcert
+          coq
+          coqprime
+          flocq
+        ]) ++ (with pkgs; [
+          gcc
+          gmp
+          gmp.dev
+          gnumake
+          pkg-config
+          time
+          which
+        ]);
+
+        # On top: editors and the C library's autotools.
+        developmentPackages = (with coqPkgs; [
+          coq-lsp
+          vsrocq-language-server
+        ]) ++ (with pkgs; [
+          autoconf
+          automake
+          clang
+          cmake
+          libtool
+          m4
+        ]) ++ [
+          rocq-mcp.packages.${system}.rocq-mcp
+        ];
+
+        shellWith = packages: pkgs.mkShell {
           shellHook = ''
             unset COQPATH
           '';
-          # Rocq proof toolchain (VST + CompCert for clightgen) plus the C
-          # toolchain to build the library the proofs extract from.
-          packages = (with coqPkgs; [
-            VST
-            compcert
-            coq
-            coq-hammer
-            coq-lsp
-            # Pocklington certificates for the field and group-order primes.
-            coqprime
-            flocq
-            vsrocq-language-server
-          ]) ++ (with pkgs; [
-            autoconf
-            automake
-            clang
-            cmake
-            cvc4
-            eprover
-            gcc
-            gmp
-            gmp.dev
-            gnumake
-            libtool
-            m4
-            pkg-config
-            vampire
-            which
-          ]) ++ [
-            rocq-mcp.packages.${system}.rocq-mcp
-          ];
+          inherit packages;
         };
+      in {
+        devShells.build = shellWith buildPackages;
+        devShells.default = shellWith (buildPackages ++ developmentPackages);
       });
 }
