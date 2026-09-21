@@ -11,18 +11,15 @@
   };
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/9720717206e5c0e3ad3065dadb23f46506eb5a9d";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    flake-compat = {
-      url = "github:NixOS/flake-compat";
-      flake = false;
-    };
 
     rocq-mcp.url = "github:remix7531/rocq-mcp/66c107a8068af1b3828e131657f6c706b7293805";
     rocq-mcp.inputs.flake-utils.follows = "flake-utils";
+    rocq-mcp.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, flake-utils, flake-compat, rocq-mcp, ... }:
+  outputs = { self, nixpkgs, flake-utils, rocq-mcp, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
