@@ -1,6 +1,8 @@
 # Formal verification with Rocq, VST, and CompCert. See README.md for targets.
 
-NPROC := $(shell nproc)
+# Jobs are bounded by memory, not cores: a VST body proof peaks near 1.4 GB.
+# NPROC sets a default job count; an explicit -j from the caller wins.
+JOBS = $(if $(filter -j%,$(MAKEFLAGS)),,$(if $(NPROC),-j $(NPROC)))
 
 # Large Clight table initializers need a larger native stack.
 ROCQ_STACK := ulimit -s 262144 &&
@@ -47,20 +49,20 @@ clight/%.v: %.c $(LIBRARY_SOURCES) $(HEADER_DEPS) Makefile
 	clightgen $(CLIGHTGEN_FLAGS) $(FV_DEFINES) -o $@ $<
 
 proof: Makefile.rocq $(SOURCES_V)
-	@$(ROCQ_STACK) $(MAKE) -j $(NPROC) --no-print-directory -f Makefile.rocq $(ROCQ_TIMING)
+	@$(ROCQ_STACK) $(MAKE) $(JOBS) --no-print-directory -f Makefile.rocq $(ROCQ_TIMING)
 
 Makefile.rocq: _RocqProject
 	@rocq makefile -f _RocqProject -o Makefile.rocq
 
 specification: Makefile.rocq $(SOURCES_V)
-	@$(ROCQ_STACK) $(SUBMAKE) -j $(NPROC) --no-print-directory -f Makefile.rocq $(ROCQ_TIMING) specification.vo
+	@$(ROCQ_STACK) $(SUBMAKE) $(JOBS) --no-print-directory -f Makefile.rocq $(ROCQ_TIMING) specification.vo
 
 html: specification doc/render.sh doc/style.css doc/header.html doc/footer.html doc/presentation.sed
 	bash doc/render.sh
 
 verif-%: Makefile.rocq $(SOURCES_V)
 	@$(if $(strip $(filter vst/$*/verif/%,$(VERIF_V))),,$(error verif-$*: no files under vst/$*/verif/ in _RocqProject (known subsystems: $(SUBS))))
-	@$(ROCQ_STACK) $(SUBMAKE) -j $(NPROC) --no-print-directory -f Makefile.rocq $(ROCQ_TIMING) \
+	@$(ROCQ_STACK) $(SUBMAKE) $(JOBS) --no-print-directory -f Makefile.rocq $(ROCQ_TIMING) \
 	  $(patsubst %.v,%.vo,$(filter vst/$*/verif/%,$(VERIF_V)))
 
 axioms: proof
@@ -80,7 +82,7 @@ VECTOR_TIMER  = $(if $(TIMED),command time -f '$@ (real: %e, user: %U, sys: %S, 
 VECTOR_TIMING = $(if $(TIMING),-time-file $<.timing)
 
 vectors: specification
-	@$(ROCQ_STACK) $(SUBMAKE) -j $(NPROC) --no-print-directory $(VECTOR_VO)
+	@$(ROCQ_STACK) $(SUBMAKE) $(JOBS) --no-print-directory $(VECTOR_VO)
 
 vectors/%.vo: vectors/%.v specification.vo
 	$(ROCQ_STACK) $(VECTOR_TIMER) rocq compile $(ROCQ_FLAGS) $(VECTOR_TIMING) $<

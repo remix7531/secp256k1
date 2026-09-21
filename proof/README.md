@@ -19,6 +19,12 @@ make axioms            # report project assumptions
 make vectors           # run SHA256 and BIP340 known-answer tests
 ```
 
+These targets build serially unless you ask for parallelism, with either
+`make -j8 proof` or `NPROC=8 make proof`, which an explicit `-j` overrides.
+Size it by memory rather than by cores: a VST body proof peaks at about
+1.4 GB resident and the heaviest at 4 GB, so allow roughly 2 GB of free
+memory per job. Count memory that is free rather than available.
+
 `make axioms` reports assumptions from every module in `_RocqProject` and
 its imports without rechecking compiled proofs. Review the reported axioms
 and admitted proofs.
