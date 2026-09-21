@@ -25,7 +25,7 @@ jobs:
     name: proof (Rocq + VST)
     runs-on: ubuntu-latest
     # A cold run is about an hour: the critical path is 3158 s and clightgen's
-    # AST accounts for 79% of it. The margin covers a cold Nix store too.
+    # AST accounts for ~80% of it. The margin covers a cold Nix store too.
     timeout-minutes: 180
 
     steps:
@@ -43,9 +43,7 @@ jobs:
         with:
           primary-key: nix-${{ runner.os }}-proof-${{ hashFiles('flake.lock') }}
           restore-prefixes-first-match: nix-${{ runner.os }}-proof-
-          # The dev shell's input closure is 4.85 GB, so a 5 G cap would evict
-          # on every run and never restore a useful store.
-          gc-max-store-size-linux: 8G
+          gc-max-store-size-linux: 5G
           purge: true
           purge-prefixes: nix-${{ runner.os }}-proof-
           purge-created: 0
@@ -53,7 +51,7 @@ jobs:
           purge-primary-key: never
 
       - name: extract the Clight AST
-        run: nix develop --impure -c make -C proof extract
+        run: nix develop --impure .#build -c make -C proof extract
 
       # clightgen is deterministic, so the AST's own hash identifies the .vo
       # built from it. This is the single most expensive file in the build.
@@ -71,4 +69,4 @@ jobs:
         run: touch proof/clight/extraction.vo
 
       - name: build the proofs
-        run: nix develop --impure -c make -C proof proof NPROC=4
+        run: nix develop --impure .#build -c make -C proof proof NPROC=4
