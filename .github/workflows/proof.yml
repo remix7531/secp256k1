@@ -1,0 +1,74 @@
+name: proof
+
+on:
+  pull_request:
+  push:
+    branches:
+      - '**'
+    tags-ignore:
+      - '**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # The flake marks CompCert unfree, so the dev shell needs this to evaluate.
+  NIXPKGS_ALLOW_UNFREE: "1"
+
+jobs:
+  proof:
+    name: proof (Rocq + VST)
+    runs-on: ubuntu-latest
+    # A cold run is about an hour: the critical path is 3158 s and clightgen's
+    # AST accounts for 79% of it. The margin covers a cold Nix store too.
+    timeout-minutes: 180
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@v17
+        with:
+          # CompCert is unfree, so Hydra never builds it and neither it nor VST
+          # is on cache.nixos.org. coq-community publishes both.
+          extra-conf: |
+            extra-substituters = https://coq-community.cachix.org
+            extra-trusted-public-keys = coq-community.cachix.org-1:WBDHojv8FM6nI4ZMh43X+2g6j4WpAn+dFhjhWmLCgnA=
+
+      - uses: nix-community/cache-nix-action@v6
+        with:
+          primary-key: nix-${{ runner.os }}-proof-${{ hashFiles('flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-proof-
+          # The dev shell's input closure is 4.85 GB, so a 5 G cap would evict
+          # on every run and never restore a useful store.
+          gc-max-store-size-linux: 8G
+          purge: true
+          purge-prefixes: nix-${{ runner.os }}-proof-
+          purge-created: 0
+          purge-last-accessed: 0
+          purge-primary-key: never
+
+      - name: extract the Clight AST
+        run: nix develop --impure -c make -C proof extract
+
+      # clightgen is deterministic, so the AST's own hash identifies the .vo
+      # built from it. This is the single most expensive file in the build.
+      - uses: actions/cache@v4
+        id: ast
+        with:
+          path: proof/clight/extraction.vo
+          key: extraction-vo-${{ hashFiles('proof/clight/extraction.v') }}
+
+      # make compares timestamps, and the checkout writes a fresh .v while the
+      # restored .vo keeps its archived mtime, so without this the cache hit
+      # still rebuilds the file it just restored.
+      - name: keep the restored AST object newer than its source
+        if: steps.ast.outputs.cache-hit == 'true'
+        run: touch proof/clight/extraction.vo
+
+      - name: build the proofs
+        run: nix develop --impure -c make -C proof proof NPROC=4
