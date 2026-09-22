@@ -1,5 +1,7 @@
 # secp256k1 proofs
 
+[![proof](https://github.com/remix7531/secp256k1/actions/workflows/proof.yml/badge.svg)](https://github.com/remix7531/secp256k1/actions/workflows/proof.yml)
+
 Rocq specifications and VST proofs for libsecp256k1.
 
 CompCert's `clightgen` extracts the production C functions and precomputed
