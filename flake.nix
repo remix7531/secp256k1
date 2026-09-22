@@ -36,6 +36,8 @@
           VST
           compcert
           coq
+          # Needed for the setup hook that puts coq-bignums on OCAMLPATH.
+          coq.ocamlPackages.findlib
           coqprime
           flocq
         ]) ++ (with pkgs; [
