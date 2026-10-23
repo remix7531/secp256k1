@@ -11,7 +11,7 @@
 
 (** Builds on the variable-time state machine in [divstep].
 
-    Adapted for Rocq 9.0 / VST 2.16. *)
+    Adapted for Rocq 9.1 / VST 2.17. *)
 
 Require Import ZArith.
 Require Import ZArith.Znumtheory.

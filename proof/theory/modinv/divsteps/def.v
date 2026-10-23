@@ -5,7 +5,7 @@
     Upstream notice reproduced in proof/README.md.
     SPDX-License-Identifier: MIT *)
 
-(** Integrated into this repository's layered proof tree (Rocq 9.0). *)
+(** Integrated into this repository's layered proof tree (Rocq 9.1). *)
 
 Require Import ZArith.
 

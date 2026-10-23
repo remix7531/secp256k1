@@ -12,7 +12,7 @@
 (** Builds on the variable-time machine in [divstep] and the matrix algebra in
     [divstep_trans].
 
-    Adapted for Rocq 9.0 / VST 2.16. *)
+    Adapted for Rocq 9.1 / VST 2.17. *)
 
 Require Import ZArith.
 Require Import ZArith.Znumtheory.

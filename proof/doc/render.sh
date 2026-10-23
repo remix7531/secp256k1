@@ -7,7 +7,7 @@ trap 'rm -rf "$coqdoc_directory"' EXIT
 
 # Keep inline expressions in one span so CSS controls their font.
 rocq doc --html --body-only --parse-comments --no-index --no-lib-name -s --latin1 \
-  --inline-notmono --coqlib_url https://rocq-prover.org/doc/V9.0.1/corelib \
+  --inline-notmono --coqlib_url https://rocq-prover.org/doc/V9.1.1/corelib \
   -Q . secp256k1 -d "$coqdoc_directory" specification.v
 
 sed -Ez -f doc/presentation.sed "$coqdoc_directory/secp256k1.specification.html" \

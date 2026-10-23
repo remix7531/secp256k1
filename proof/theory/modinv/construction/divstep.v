@@ -11,7 +11,7 @@
 (** The transition-matrix algebra lives in [divstep_trans]; the constant-time
     (zeta) machine in [divstep_zeta].
 
-    Adapted for Rocq 9.0 / VST 2.16. *)
+    Adapted for Rocq 9.1 / VST 2.17. *)
 
 Require Import ZArith.
 Require Import ZArith.Znumtheory.

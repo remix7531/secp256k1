@@ -19,7 +19,7 @@
 
     The transition-matrix algebra lives in [posdivstep_trans].
 
-    Written for Rocq 9.0 / VST 2.16. *)
+    Written for Rocq 9.1 / VST 2.17. *)
 
 Require Import ZArith.
 Require Import ZArith.Znumtheory.

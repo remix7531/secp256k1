@@ -5,7 +5,7 @@
     Upstream notice reproduced in proof/README.md.
     SPDX-License-Identifier: MIT *)
 
-(** Adapted for Rocq 9.0 / VST 2.16 in this repository's layered proof tree. *)
+(** Adapted for Rocq 9.1 / VST 2.17 in this repository's layered proof tree. *)
 
 Require Import ZArith.
 Require Import Bool.

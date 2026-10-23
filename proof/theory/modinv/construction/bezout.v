@@ -9,7 +9,7 @@
     hoisted into its own file to keep [theory.modinv.construction.inverse] focused.
     Referenced only by [theory.modinv.construction.inverse].
 
-    Adapted for Rocq 9.0 / VST 2.16 in this repository's layered proof tree. *)
+    Adapted for Rocq 9.1 / VST 2.17 in this repository's layered proof tree. *)
 
 Require Import ZArith.
 Require Import Coq.ZArith.Znumtheory.

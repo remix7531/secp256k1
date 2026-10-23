@@ -14,7 +14,7 @@
     here), in its [Gprog_modinv_public]; the internal ones below are listed in
     this file's [Gprog_modinv_impl].
 
-    Adapted for Rocq 9.0 / VST 2.16 against this repo's single extraction AST. *)
+    Adapted for Rocq 9.1 / VST 2.17 against this repo's single extraction AST. *)
 
 Require Import VST.floyd.proofauto.
 Require Import secp256k1.vst.base.

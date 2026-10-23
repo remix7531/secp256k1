@@ -15,7 +15,7 @@
     [structs_modinv] aliases (for the spatial notations at the bottom), so it is
     layering-sound below [vst/scalar/contract.v].
 
-    Adapted for Rocq 9.0 / VST 2.16 against this repo's single extraction AST. *)
+    Adapted for Rocq 9.1 / VST 2.17 against this repo's single extraction AST. *)
 
 Require Import secp256k1.vst.base.
 Require Import secp256k1.theory.integers.extra_math.

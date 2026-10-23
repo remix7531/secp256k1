@@ -12,7 +12,7 @@
     construction; the caller-facing inverse property is stated inline in the
     public [secp256k1_scalar_inverse] funspec (no separate spec/bridge here).
 
-    Adapted for Rocq 9.0 / VST 2.16 in this repository's layered proof tree. *)
+    Adapted for Rocq 9.1 / VST 2.17 in this repository's layered proof tree. *)
 
 Require Import ZArith.
 Require Import Coq.ZArith.Znumtheory.
