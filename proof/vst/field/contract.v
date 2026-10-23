@@ -113,8 +113,7 @@ Definition spec_secp256k1_fe_mul : ident * funspec :=
        lr : list Z, la : list Z, lb : list Z,
        ma : Z, mb : Z, va : Z, vb : Z,
        sh_r : share, sh_a : share, sh_b : share
-  PRE [ tptr (Tstruct __851 noattr), tptr (Tstruct __851 noattr),
-        tptr (Tstruct __851 noattr) ]
+  PRE [ tptr t_secp256k1_fe, tptr t_secp256k1_fe, tptr t_secp256k1_fe ]
     PROP (writable_share sh_r;
           readable_share sh_a;
           readable_share sh_b;

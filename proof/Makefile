@@ -15,7 +15,9 @@ SOURCES_V := $(patsubst %.c,clight/%.v,$(EXTRACT_SRCS))
 HEADER_DEPS := $(wildcard ../src/*.h ../src/modules/*/*.h ../include/*.h)
 
 # CompCert requires the struct-based 128-bit backend. VERIFY stays disabled.
-FV_DEFINES := -DUSE_FORCE_WIDEMUL_INT128_STRUCT=1
+# External default callbacks keep stdio's FILE out of the AST: VST rejects
+# every composite with a bitfield, and glibc's FILE has one.
+FV_DEFINES := -DUSE_FORCE_WIDEMUL_INT128_STRUCT=1 -DUSE_EXTERNAL_DEFAULT_CALLBACKS=1
 
 # Disable the ctz builtin so util.h selects its software implementation.
 CLIGHTGEN_FLAGS := -normalize -I../include -I../src -Wp,-w -U__has_builtin
