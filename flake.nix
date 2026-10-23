@@ -28,7 +28,7 @@
             builtins.elem (pkgs.lib.getName pkg) [ "compcert" ];
         };
 
-        coqPkgs = pkgs.coqPackages_9_0;
+        coqPkgs = pkgs.rocqPackages_9_1;
 
         # What the proof targets need, and nothing more: gcc for clightgen's
         # preprocessing, GNU time for the default TIMED mode.

@@ -94,7 +94,8 @@ Proof.
   clear Hkeq Hn n.
   revert z Hz0 Hsz.
   induction k as [| k IHk]; intros z Hz0 Hsz.
-  - (* base: the empty array is [emp], as is [mapsto_zeros 0] *)
+  - (* base: the empty array is [emp], and [mapsto_zeros 0] is [emp] plus
+       offset bounds *)
     change (Z.of_nat 0) with 0.
     rewrite data_at_zero_array_eq by (simpl; auto).
     unfold mapsto_zeros.
@@ -103,7 +104,9 @@ Proof.
     + apply prop_right.
       pose proof (Ptrofs.unsigned_range (Ptrofs.repr z)).
       lia.
-    + apply derives_refl.
+    + rewrite predicates_hered.prop_true_andp
+        by (pose proof (Ptrofs.unsigned_range (Ptrofs.repr z)); lia).
+      apply derives_refl.
   - (* step: peel the first byte off both sides *)
     rewrite Nat2Z.inj_succ.
     replace (Z.succ (Z.of_nat k)) with (1 + Z.of_nat k) by lia.
@@ -172,6 +175,8 @@ Proof.
           rewrite Nat2Z.inj_succ in Hsz.
           lia.
         + apply andp_left2.
+          rewrite predicates_hered.prop_true_andp
+            by (pose proof (Ptrofs.unsigned_range (Ptrofs.repr z)); lia).
           rewrite predicates_sl.sepcon_emp.
           apply derives_refl.
       - (* the [Vundef] disjunct is impossible: the byte value is [0] *)
