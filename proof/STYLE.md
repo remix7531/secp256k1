@@ -98,7 +98,7 @@ not compress (the per-phase rhythm is required, not optional).
 - **No** blank line between a comment and the tactic it annotates.
 - One blank line between top-level `Lemma` / `Definition`s; none before `Qed`.
 
-Target rhythm: the mul-pipeline files (`vst/scalar/verif/impl/scalar_muladd.v`,
+Target rhythm: the mul-pipeline files (`vst/int128/verif/u128_accum_mul.v`,
 `vst/scalar/verif/impl/scalar_mul_512.v`) -- roughly one blank line per logical
 step, about 20% of lines blank. Files compressed well below that read as dense
 and must be re-spaced.
@@ -313,9 +313,9 @@ Definition spec_secp256k1_foo : ident * funspec :=
 The automation layer lives under `tactics/`. Prefer it over hand-rolled
 patterns:
 
-- **`rep_lia` over `lia`** for goals involving `UInt64` / `UInt128` / `Acc`
+- **`rep_lia` over `lia`** for goals involving `UInt64` / `UInt128`
   values. The `rep_lia_setup2` hook (in `vst/tactics/core.v`) auto-poses the
-  carried range fact for every `u64_val ?x`, `u128_val ?x`, `acc_val ?x`,
+  carried range fact for every `u64_val ?x`, `u128_val ?x`,
   `u256_val ?x` in the goal, eliminating manual
   `pose proof (u64_range x)` calls. There is exactly ONE `rep_lia_setup2 ::=`
   override in the project; extend it there, never re-override elsewhere.
@@ -331,10 +331,10 @@ patterns:
   are registered with `Hint Rewrite` in the `rep_lia` database so
   `u64_val N_C_i_u64` reduces automatically.
 - **Limbs**: use the generic `limb (2^64) v i` from `theory/integers/arithmetic.v`.
-  The C-representation definitions (`uint128_to_val`, `acc_to_val`,
+  The C-representation definitions (`uint128_to_val`,
   `uint256_to_val`, `uint512_to_val` in `vst/helper/repr.v`) use
   **inline splits** `(v / 2^k) mod 2^64` in their bodies, matching the spec
-  style. Bridge lemmas `uint128/acc/uint256/uint512_to_val_limb` (registered
+  style. Bridge lemmas `uint128/uint256/uint512_to_val_limb` (registered
   with `Hint Rewrite ... : to_val_limb`) equate the inline form to
   `limb (2^64) v i`, so proofs can convert with `autorewrite with to_val_limb`.
 - **`limb_at_0` lemma** (`theory/integers/bits.v`): rewrites `limb (2^64) v 0` back to

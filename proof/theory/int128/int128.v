@@ -16,8 +16,7 @@ Local Obligation Tactic := intros.
 
 (* ================================================================= *)
 (** ** Unsigned operations -- [mul_64] / [u128_lo] / [u256_limb].
-    (The word types [UInt64] .. [UInt512] live in [theory/integers/machine.v]; the
-    accumulator [Acc] in [theory/int128/acc.v].) *)
+    (The word types [UInt64] .. [UInt512] live in [theory/integers/machine.v].) *)
 
 (** 64 x 64 -> 128-bit multiplication. *)
 Program Definition mul_64 (a b : UInt64) : UInt128 :=

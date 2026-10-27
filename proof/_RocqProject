@@ -7,7 +7,6 @@
 clight/extraction.v
 
 # VST setup.
-vst/array_data_at.v
 vst/base.v
 vst/composites.v
 vst/integers.v
@@ -46,7 +45,6 @@ theory/integers/machine.v
 specification.v
 
 theory/scalar/limbs.v
-theory/int128/acc.v
 theory/ecmult/ecmult_gen.v
 theory/ecmult/ecmult.v
 theory/int128/int128.v

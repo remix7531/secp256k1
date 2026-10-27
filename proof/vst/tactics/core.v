@@ -11,7 +11,7 @@
     - [Inhabitant] instances for the model word types (for [deadvars!]);
     - [fold_limb]/[refold_div] goal normalisation over [theory.bits];
     - the pure carry vocabulary ([Z_div_add_carry], [carry_value],
-      [limb_add_0/1/2], [ltu_carry_b2z], [eqm_of_mod_eq]);
+      [limb_add_0/1], [ltu_carry_b2z], [eqm_of_mod_eq]);
     - generic [Int64] shift / mul / zero-test bridges, on top of the word
       <-> [Z] bridges and the [int_to_z] database re-exported from
       [vst.integers].
@@ -22,10 +22,8 @@
 Require Export secp256k1.vst.base.
 Require Export secp256k1.theory.integers.arithmetic.
 Require Export secp256k1.theory.integers.bits.
-Require Export secp256k1.vst.array_data_at.
 Require Export secp256k1.vst.integers.
 Require Export secp256k1.theory.int128.int128.
-Require Export secp256k1.theory.int128.acc.
 Require Export secp256k1.theory.scalar.limbs.
 Require secp256k1.specification.
 Import specification.Math.
@@ -46,16 +44,14 @@ Proof. reflexivity. Qed.
 
 (** Reduction rules for record projections.
     These let [rep_lia] and VST's internal solvers see through
-    [mkUInt64]/[mkAcc] wrappers without manual [simpl]. *)
+    [mkUInt64] wrappers without manual [simpl]. *)
 Lemma u64_val_mk : forall z H, u64_val (mkUInt64 z H) = z.
 Proof. reflexivity. Qed.
-Lemma acc_val_mk : forall z H, acc_val (mkAcc z H) = z.
-Proof. reflexivity. Qed.
-#[export] Hint Rewrite u64_val_mk acc_val_mk : rep_lia.
+#[export] Hint Rewrite u64_val_mk : rep_lia.
 
 (** Extend VST's [rep_lia_setup2] hook so [rep_lia] auto-introduces
-    the carried range fact for every [u64_val ?x] / [u128_val ?x] /
-    [acc_val ?x] in the goal -- same mechanism VST uses for
+    the carried range fact for every [u64_val ?x] / [u128_val ?x]
+    in the goal -- same mechanism VST uses for
     [Int.unsigned] / [Int64.signed].  This removes the need to
     [pose proof (u64_range x)] manually before [rep_lia] calls. *)
 Lemma u128_val_hi_lt : forall x : UInt128, u128_val x / 2^64 < 2^64.
@@ -86,7 +82,6 @@ Ltac rep_lia_setup2 ::=
   pose_lemmas u64_val u64_range;
   pose_lemmas u128_val u128_range;
   pose_lemmas u128_val u128_val_hi_lt;
-  pose_lemmas acc_val acc_range;
   pose_lemmas u256_val u256_range;
   (* signed: auto-pose the carried two-sided range for every i64/i128 value *)
   pose_lemmas i64_val i64_range;
@@ -101,7 +96,7 @@ Ltac rep_lia_setup2 ::=
 
 (** Monotonicity of division by [2^64] over the integers, packaged for
     direct use after rewriting an accumulator carry as [acc / 2^64].
-    Used to discharge [acc_val carry_k <= bound] goals in
+    Used to discharge the per-round carry bounds in
     [Verif_scalar_mul_512]. *)
 Lemma carry_div_ub : forall a b,
   a <= b -> a / 2^64 <= b / 2^64.
@@ -146,7 +141,6 @@ Qed.
 
 #[export] Instance Inhabitant_UInt64_ : Inhabitant UInt64 := mkUInt64 0 ltac:(lia).
 #[export] Instance Inhabitant_UInt128_ : Inhabitant UInt128 := mkUInt128 0 ltac:(lia).
-#[export] Instance Inhabitant_Acc_ : Inhabitant Acc := mkAcc 0 ltac:(lia).
 #[export] Instance Inhabitant_Int64_ : Inhabitant Int64 := mkInt64 0 ltac:(lia).
 #[export] Instance Inhabitant_Int128_ : Inhabitant Int128 := mkInt128 0 ltac:(lia).
 #[export] Instance Inhabitant_UInt256_ : Inhabitant UInt256 := mkUInt256 0 ltac:(lia).
@@ -157,7 +151,7 @@ Qed.
 (* ================================================================= *)
 (** ** Signed wrapper-projection rewrites
 
-    Analogues of [u64_val_mk] / [acc_val_mk]: let [rep_lia] (and the
+    Analogues of [u64_val_mk]: let [rep_lia] (and the
     [autorewrite with rep_lia] callers) see through [mkInt64] / [mkInt128]
     without a manual [simpl].  The companion [int128_to_val_limb] bridge
     lives with the [to_val_limb] lemmas below. *)
@@ -324,7 +318,7 @@ Qed.
 
 (**
     These lemmas justify the limb-by-limb addition used across all
-    carry-propagating proofs (muladd, sumadd, accum_u64, etc.).
+    carry-propagating proofs (accum_mul, accum_u64, etc.).
     The core identity is
 
       [(a + b) / M  =  a/M  +  b/M  +  (a mod M + b mod M) / M]
@@ -428,116 +422,6 @@ Proof.
   rewrite Zplus_mod_idemp_r.
   f_equal.
   lia.
-Qed.
-
-(** Limb 2: sum of high limbs + carry-in mod 2^64 = high limb of sum.
-    Requires [b < 2^128] (i.e. b fits in 2 limbs) so that [b/(M*M) = 0]. *)
-Lemma limb_add_2 : forall a b,
-  0 <= a -> 0 <= b -> b < 2^128 ->
-  (limb (2^64) a 2 + (if limb (2^64) a 1 + limb (2^64) b 1 +
-    (if limb (2^64) a 0 + limb (2^64) b 0 <? 2^64 then 0 else 1) <? 2^64 then 0 else 1))
-  mod 2^64 = limb (2^64) (a + b) 2.
-Proof.
-  intros a b Ha Hb Hb128.
-
-  (* Setup: unfold limb, introduce M = 2^64 *)
-  unfold limb.
-  simpl Z.of_nat.
-  rewrite Z.pow_0_r, !Z.div_1_r, Z.pow_1_r.
-  change ((2^64)^2) with (2^64 * 2^64).
-  set (M := (2^64)%Z).
-
-  (* b < M^2, so b / (M*M) = 0 *)
-  assert (Hbdiv : b / (M * M) = 0).
-  { apply Z.div_small.
-    unfold M in *.
-    lia. }
-
-  (* Decompose (a+b)/(M*M) via carry identity, cancel b/(M*M) = 0 *)
-  replace ((a + b) / (M * M))
-    with (a / (M * M) + b / (M * M) +
-          (a mod (M * M) + b mod (M * M)) / (M * M))
-    by (symmetry; apply Z_div_add_carry; [unfold M; lia | lia | lia]).
-  rewrite Hbdiv, Z.add_0_r.
-
-  (* Name the four half-limbs and establish ranges *)
-  set (la0 := a mod M).
-  set (lb0 := b mod M).
-  set (la1 := a / M mod M).
-  set (lb1 := b / M mod M).
-  assert (Hla0 : 0 <= la0 < M) by (unfold la0, M; apply Z.mod_pos_bound; lia).
-  assert (Hlb0 : 0 <= lb0 < M) by (unfold lb0, M; apply Z.mod_pos_bound; lia).
-  assert (Hla1 : 0 <= la1 < M) by (unfold la1, M; apply Z.mod_pos_bound; lia).
-  assert (Hlb1 : 0 <= lb1 < M) by (unfold lb1, M; apply Z.mod_pos_bound; lia).
-
-  (* Define the carry from limb 1 -> limb 2 *)
-  set (carry2 := if la0 + lb0 <? M
-                 then if la1 + lb1 <? M then 0 else 1
-                 else if la1 + lb1 + 1 <? M then 0 else 1).
-
-  (* Show the LHS carry expression equals carry2 *)
-  assert (Hcarry2_lhs :
-    (if la1 + lb1 + (if la0 + lb0 <? M then 0 else 1) <? M
-     then 0 else 1) = carry2).
-  { unfold carry2.
-    destruct (la0 + lb0 <? M) eqn:Ec0.
-    all: destruct (la1 + lb1 <? M) eqn:Ec1.
-    all: first [ replace (la1 + lb1 + 0) with (la1 + lb1) by lia
-               | replace (la1 + lb1 + 1) with (la1 + lb1 + 1) by lia ].
-    all: try rewrite Ec1.
-    all: try reflexivity.
-    all: destruct (la1 + lb1 + 1 <? M); reflexivity. }
-  rewrite Hcarry2_lhs.
-
-  (* Recombine a mod (M*M) and b mod (M*M) into two-limb form *)
-  replace (a mod (M * M)) with (la0 + la1 * M)
-    by (unfold la0, la1, M; rewrite Zmod_recombine by lia; ring).
-  replace (b mod (M * M)) with (lb0 + lb1 * M)
-    by (unfold lb0, lb1, M; rewrite Zmod_recombine by lia; ring).
-
-  (* Show the combined two-limb sum / (M*M) equals carry2 *)
-  assert (Hcarry_val :
-    (la0 + la1 * M + (lb0 + lb1 * M)) / (M * M) = carry2).
-  { unfold carry2.
-    destruct (la0 + lb0 <? M) eqn:Ec0; destruct (la1 + lb1 <? M) eqn:Ec1.
-    - (* no carry from limb 0, no carry from limb 1 *)
-      apply Z.ltb_lt in Ec0.
-      apply Z.ltb_lt in Ec1.
-      apply Z.div_small.
-      lia.
-    - (* no carry from limb 0, carry from limb 1 *)
-      apply Z.ltb_lt in Ec0.
-      apply Z.ltb_ge in Ec1.
-      symmetry.
-      apply Z.div_unique with (r := la0 + lb0 + (la1 + lb1 - M) * M); lia.
-    - (* carry from limb 0, no carry from limb 1 *)
-      apply Z.ltb_ge in Ec0.
-      apply Z.ltb_lt in Ec1.
-      destruct (la1 + lb1 + 1 <? M) eqn:Ec1'.
-      + apply Z.ltb_lt in Ec1'.
-        apply Z.div_small.
-        lia.
-      + apply Z.ltb_ge in Ec1'.
-        symmetry.
-        apply Z.div_unique
-          with (r := la0 + lb0 - M + (la1 + lb1 + 1 - M) * M); lia.
-    - (* carry from limb 0, carry from limb 1 *)
-      apply Z.ltb_ge in Ec0.
-      apply Z.ltb_ge in Ec1.
-      destruct (la1 + lb1 + 1 <? M) eqn:Ec1'.
-      + apply Z.ltb_lt in Ec1'.
-        symmetry.
-        apply Z.div_unique
-          with (r := la0 + lb0 - M + (la1 + lb1 + 1) * M); lia.
-      + apply Z.ltb_ge in Ec1'.
-        symmetry.
-        apply Z.div_unique
-          with (r := la0 + lb0 - M + (la1 + lb1 + 1 - M) * M); lia. }
-  rewrite Hcarry_val.
-
-  (* Final step: strip inner mod through outer mod *)
-  rewrite Zplus_mod_idemp_l.
-  reflexivity.
 Qed.
 
 (** Carry detection via [ltu]: [b2z (repr(c0+tl) < repr(tl))] equals
@@ -721,23 +605,6 @@ Proof.
   - apply Z.div_lt_upper_bound; lia.
 Qed.
 
-(** Accumulator round identity: [lo + carry * 2^64 = acc_val acc].
-    Used to telescope the carry chain in reduction proofs. *)
-Lemma round_identity : forall (acc : Acc) (lo : UInt64) (carry : Acc),
-  lo = acc_lo acc ->
-  acc_val carry = acc_val acc / 2^64 ->
-  u64_val lo + acc_val carry * 2^64 = acc_val acc.
-Proof.
-  intros.
-  rewrite H.
-  unfold acc_lo.
-  simpl u64_val.
-  rewrite ?limb_at_0.
-  rewrite H0.
-  pose proof (Z_div_mod_eq_full (acc_val acc) (2^64)).
-  lia.
-Qed.
-
 (** Low half of a [UInt128]: [u64_val (u128_lo x) = u128_val x mod 2^64]. *)
 Lemma u128_lo_val : forall x : UInt128,
   u64_val (u128_lo x) = u128_val x mod 2^64.
@@ -767,8 +634,8 @@ Qed.
 
 
 (* ================================================================= *)
-(** ** Accumulator carry bridges -- [muladd_limb*] / [sumadd_limb*]
-    (shared by [u128_accum_mul] and the scalar muladd/sumadd impl bodies).
+(** ** Accumulator carry bridge -- [muladd_limb1]
+    (shared by [u128_accum_mul] and [u128_accum_mul_carry]).
 
     The C code propagates carries through 64-bit limbs using
     [c0 < tl] as a carry-detect idiom.  After VST symbolic execution,
@@ -812,212 +679,5 @@ Proof.
   change Int64.modulus with (2^64).
   apply eqm_of_mod_eq.
   apply limb_add_1; lia.
-Qed.
-
-(** Bridge for limb 2: normalize two levels of [ltu]/[signed]/[repr]
-    into the carry form that [limb_add_2] uses.
-
-    Takes [av] and [bv] as separate u64 factors (not just their
-    product) because we need [(av * bv) / 2^64 <= 2^64 - 2] to
-    prove the intermediate carry fits in a u64. *)
-Lemma muladd_limb2 : forall acc_v av bv,
-  0 <= acc_v ->
-  0 <= av < 2^64 -> 0 <= bv < 2^64 ->
-  let prod := av * bv in
-  let c0_carry :=
-    Z.b2z (Int64.ltu
-      (Int64.repr (limb (2^64) acc_v 0 + limb (2^64) prod 0))
-      (Int64.repr (limb (2^64) prod 0))) in
-  let th := limb (2^64) prod 1 + Int.signed (Int.repr c0_carry) in
-  Int64.eqm
-    (limb (2^64) acc_v 2 +
-      Int.signed (Int.repr
-        (Z.b2z (Int64.ltu
-          (Int64.repr (limb (2^64) acc_v 1 + th))
-          (Int64.repr th)))))
-    (limb (2^64) (acc_v + prod) 2).
-Proof.
-  intros acc_v av bv Hacc Hav Hbv prod c0_carry th.
-
-  (* Limb ranges *)
-  pose proof (limb_u64_range acc_v 0) as Hla0.
-  pose proof (limb_u64_range prod 0) as Hlb0.
-  pose proof (limb_u64_range acc_v 1) as Hla1.
-  pose proof (limb_u64_range prod 1) as Hlb1.
-
-  (* Inline the let-bindings *)
-  subst c0_carry th.
-
-  (* ===== Normalize the inner (limb 0) carry ===== *)
-
-  (* ltu/b2z -> if-then-else carry *)
-  rewrite (ltu_carry_b2z (limb (2^64) acc_v 0) (limb (2^64) prod 0)) by assumption.
-
-  (* Int.signed (Int.repr (0 or 1)) = (0 or 1) *)
-  assert (Hinner :
-    Int.signed (Int.repr
-      (if limb (2^64) acc_v 0 + limb (2^64) prod 0 <? Int64.modulus then 0 else 1))
-    = (if limb (2^64) acc_v 0 + limb (2^64) prod 0 <? Int64.modulus then 0 else 1)).
-  { destruct (limb (2^64) acc_v 0 + limb (2^64) prod 0 <? Int64.modulus); reflexivity. }
-  rewrite Hinner.
-  clear Hinner.
-
-  (* Name the carry and bound it *)
-  set (c0' := if limb (2^64) acc_v 0 + limb (2^64) prod 0 <? Int64.modulus then 0 else 1).
-  assert (Hc0' : 0 <= c0' <= 1)
-    by (subst c0'; destruct (limb (2^64) acc_v 0 + limb (2^64) prod 0 <? Int64.modulus); lia).
-
-  (* prod high limb <= 2^64 - 2, so th = prod_hi + c0' fits in u64 *)
-  assert (Hlb1' : limb (2^64) prod 1 <= Int64.max_unsigned - 1).
-  { unfold limb.
-    rewrite Z.pow_1_r.
-    subst prod.
-    change (2^64) with Int64.modulus.
-    pose proof (mul_u64_hi_le av bv Hav Hbv).
-    change (2^64) with Int64.modulus in H.
-    rewrite Z.mod_small by (split; [apply Z.div_pos; rep_lia | rep_lia]).
-    rep_lia. }
-  assert (Hth : 0 <= limb (2^64) prod 1 + c0' <= Int64.max_unsigned)
-    by (subst c0'; destruct (limb (2^64) acc_v 0 + limb (2^64) prod 0 <? Int64.modulus); lia).
-
-  (* ===== Normalize the outer (limb 1) carry ===== *)
-
-  (* ltu/b2z -> if-then-else carry *)
-  rewrite (ltu_carry_b2z (limb (2^64) acc_v 1) (limb (2^64) prod 1 + c0'))
-    by (try assumption; lia).
-
-  (* Int.signed (Int.repr (0 or 1)) = (0 or 1) *)
-  assert (Houter :
-    Int.signed (Int.repr
-      (if limb (2^64) acc_v 1 + (limb (2^64) prod 1 + c0') <? Int64.modulus
-       then 0 else 1))
-    = (if limb (2^64) acc_v 1 + (limb (2^64) prod 1 + c0') <? Int64.modulus
-       then 0 else 1)).
-  { destruct (limb (2^64) acc_v 1 + (limb (2^64) prod 1 + c0') <? Int64.modulus);
-    reflexivity. }
-  rewrite Houter.
-  clear Houter.
-
-  (* Re-associate addition for limb_add_2 *)
-  replace (limb (2^64) acc_v 1 + (limb (2^64) prod 1 + c0'))
-    with (limb (2^64) acc_v 1 + limb (2^64) prod 1 + c0') by lia.
-  change Int64.modulus with (2^64).
-
-  (* Conclude via limb_add_2 *)
-  subst c0'.
-  apply eqm_of_mod_eq.
-  apply limb_add_2; nia.
-Qed.
-
-(* ----------------------------------------------------------------- *)
-(** *** sumadd carry bridge lemmas
-
-    Same idea as [muladd_limb1] / [muladd_limb2], but for adding a
-    plain u64 value [av] (rather than a product) to an accumulator.
-    Since [av < 2^64], its high limbs are 0, which simplifies the
-    carry chain.
-
-    Stated as [Int64.repr] equalities so that callers can [apply]
-    directly after [f_equal], without an intermediate [eqm] step. *)
-
-(** Bridge for sumadd limb 0. *)
-Lemma sumadd_limb0 : forall acc_v av,
-  0 <= acc_v -> 0 <= av < 2^64 ->
-  Int64.eqm (limb (2^64) acc_v 0 + av) (limb (2^64) (acc_v + av) 0).
-Proof.
-  intros.
-  apply eqm_of_mod_eq.
-  unfold limb; simpl Z.of_nat;
-    rewrite Z.pow_0_r, !Z.div_1_r.
-  apply Zplus_mod_idemp_l.
-Qed.
-
-(** Bridge for sumadd limb 1: normalize [ltu] / [b2z] into
-    [limb_add_1] form.  The caller strips [Int.unsigned] or
-    [Int.signed] (one rewrite) before applying this lemma. *)
-Lemma sumadd_limb1 : forall acc_v av,
-  0 <= acc_v -> 0 <= av < 2^64 ->
-  Int64.eqm
-    (limb (2^64) acc_v 1 +
-      Z.b2z (Int64.ltu
-        (Int64.repr (limb (2^64) acc_v 0 + av))
-        (Int64.repr av)))
-    (limb (2^64) (acc_v + av) 1).
-Proof.
-  intros acc_v av Hacc Hav.
-  pose proof (limb_u64_range acc_v 0).
-
-  rewrite (ltu_carry_b2z (limb (2^64) acc_v 0) av) by rep_lia.
-  change Int64.modulus with (2^64).
-
-  apply eqm_of_mod_eq.
-  assert (Hav0 : limb (2^64) av 0 = av).
-  { unfold limb. simpl Z.of_nat.
-    rewrite Z.pow_0_r, Z.div_1_r.
-    apply Z.mod_small. lia. }
-  assert (Hav1 : limb (2^64) av 1 = 0)
-    by (apply limb_high_zero; simpl Z.of_nat; lia).
-  transitivity ((limb (2^64) acc_v 1 + (limb (2^64) av 1 +
-    (if limb (2^64) acc_v 0 + limb (2^64) av 0 <? 2^64 then 0 else 1))) mod 2^64).
-  - f_equal. rewrite Hav0, Hav1. lia.
-  - apply limb_add_1; lia.
-Qed.
-
-(** Bridge for sumadd limb 2: normalize two levels of carry
-    (unsigned inner, signed outer) into [limb_add_2_u64] form. *)
-Lemma sumadd_limb2 : forall acc_v av,
-  0 <= acc_v -> 0 <= av < 2^64 ->
-  let c0_carry :=
-    Z.b2z (Int64.ltu
-      (Int64.repr (limb (2^64) acc_v 0 + av))
-      (Int64.repr av)) in
-  let over := Int.unsigned (Int.repr c0_carry) in
-  Int64.eqm
-    (limb (2^64) acc_v 2 +
-      Int.signed (Int.repr
-        (Z.b2z (Int64.ltu
-          (Int64.repr (limb (2^64) acc_v 1 + over))
-          (Int64.repr over)))))
-    (limb (2^64) (acc_v + av) 2).
-Proof.
-  intros acc_v av Hacc Hav c0_carry over.
-  pose proof (limb_u64_range acc_v 0) as Hla0.
-  pose proof (limb_u64_range acc_v 1) as Hla1.
-
-  subst c0_carry over.
-
-  (* Normalize inner (limb 0) carry *)
-  rewrite (ltu_carry_b2z (limb (2^64) acc_v 0) av) by rep_lia.
-  set (c0' := if limb (2^64) acc_v 0 + av <? Int64.modulus then 0 else 1).
-  assert (Hc0' : 0 <= c0' <= 1)
-    by (subst c0'; destruct (limb (2^64) acc_v 0 + av <? Int64.modulus); lia).
-  assert (Hcu : Int.unsigned (Int.repr c0') = c0')
-    by (subst c0'; destruct (limb (2^64) acc_v 0 + av <? Int64.modulus); reflexivity).
-  rewrite Hcu.
-
-  (* Normalize outer (limb 1) carry *)
-  rewrite (ltu_carry_b2z (limb (2^64) acc_v 1) c0') by rep_lia.
-  assert (Hcs :
-    Int.signed (Int.repr
-      (if limb (2^64) acc_v 1 + c0' <? Int64.modulus then 0 else 1))
-    = (if limb (2^64) acc_v 1 + c0' <? Int64.modulus then 0 else 1))
-    by (destruct (limb (2^64) acc_v 1 + c0' <? Int64.modulus); reflexivity).
-  rewrite Hcs.
-  change Int64.modulus with (2^64).
-
-  (* Derive from limb_add_2: substitute limb (2^64) av 0 = av, limb (2^64) av 1 = 0 *)
-  subst c0'.
-  apply eqm_of_mod_eq.
-  pose proof (limb_add_2 acc_v av Hacc ltac:(lia) ltac:(lia)) as H.
-  rewrite (limb_high_zero av 0) in H by (simpl Z.of_nat; lia).
-  replace (limb (2^64) av 0) with av in H
-    by (unfold limb; simpl Z.of_nat;
-        rewrite Z.pow_0_r, Z.div_1_r;
-        symmetry; apply Z.mod_small; lia).
-  replace (limb (2^64) acc_v 1 + 0 +
-    (if limb (2^64) acc_v 0 + av <? 2 ^ 64 then 0 else 1))
-    with (limb (2^64) acc_v 1 +
-    (if limb (2^64) acc_v 0 + av <? 2 ^ 64 then 0 else 1)) in H by lia.
-  exact H.
 Qed.
 

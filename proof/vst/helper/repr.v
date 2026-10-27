@@ -11,7 +11,6 @@ Require Import secp256k1.theory.int128.int128.
 Require Import secp256k1.theory.scalar.limbs.
 Require Import secp256k1.theory.integers.arithmetic.
 Require Import secp256k1.theory.integers.bits.
-Require Import secp256k1.vst.array_data_at.
 
 (* ================================================================= *)
 (** ** Unsigned model-to-C bridges -- [uint64_to_val] / [uint128_to_val] / [uint256_to_val] / [scalar_to_val] / [uint512_to_val] / [bytes_to_val], plus the [val_to_*] reconstructors. *)
