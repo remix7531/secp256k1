@@ -44,7 +44,8 @@ Definition arithmetic_function_idents : list ident :=
    _secp256k1_scalar_verify; _secp256k1_scalar_split_lambda;
    _secp256k1_umul128; _secp256k1_mul128; _secp256k1_u128_load;
    _secp256k1_u128_mul; _secp256k1_u128_accum_mul;
-   _secp256k1_u128_accum_u64; _secp256k1_u128_rshift;
+   _secp256k1_u128_accum_u64; _secp256k1_u128_accum_mul_carry;
+   _secp256k1_u128_accum_u64_carry; _secp256k1_u128_rshift;
    _secp256k1_u128_to_u64; _secp256k1_u128_hi_u64;
    _secp256k1_u128_from_u64; _secp256k1_u128_check_bits;
    _secp256k1_i128_load; _secp256k1_i128_mul;

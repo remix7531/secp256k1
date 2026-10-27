@@ -103,7 +103,9 @@ vst/int128/verif/impl/i128_dissip_mul.v
 vst/int128/verif/impl/mul128.v
 vst/int128/verif/impl/umul128.v
 vst/int128/verif/u128_accum_mul.v
+vst/int128/verif/u128_accum_mul_carry.v
 vst/int128/verif/u128_accum_u64.v
+vst/int128/verif/u128_accum_u64_carry.v
 vst/int128/verif/u128_check_bits.v
 vst/int128/verif/u128_from_u64.v
 vst/int128/verif/u128_hi_u64.v

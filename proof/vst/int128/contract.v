@@ -76,6 +76,40 @@ Definition spec_secp256k1_u128_accum_u64 : ident * funspec :=
     RETURN ()
     SEP (u128_at sh r_ptr r').
 
+(** [secp256k1_u128_accum_mul_carry]: add a*b to a 128-bit accumulator modulo
+    2^128 and return the carry out of the top bit. *)
+Definition spec_secp256k1_u128_accum_mul_carry : ident * funspec :=
+  DECLARE _secp256k1_u128_accum_mul_carry
+  WITH r_ptr : val, r : UInt128, a : UInt64, b : UInt64, sh : share
+  PRE [ tptr t_secp256k1_u128, tulong, tulong ]
+    PROP (writable_share sh)
+    PARAMS (r_ptr; uint64_to_val a; uint64_to_val b)
+    SEP (u128_at sh r_ptr r)
+  POST [ tint ]
+    EX r' : UInt128, EX carry : Z,
+    PROP (carry = 0 \/ carry = 1;
+          Z.add (u128_val r') (Z.mul carry (2^128)) =
+          Z.add (u128_val r) (Z.mul (u64_val a) (u64_val b)))
+    RETURN (Vint (Int.repr carry))
+    SEP (u128_at sh r_ptr r').
+
+(** [secp256k1_u128_accum_u64_carry]: add a 64-bit value to a 128-bit
+    accumulator modulo 2^128 and return the carry out of the top bit. *)
+Definition spec_secp256k1_u128_accum_u64_carry : ident * funspec :=
+  DECLARE _secp256k1_u128_accum_u64_carry
+  WITH r_ptr : val, r : UInt128, a : UInt64, sh : share
+  PRE [ tptr t_secp256k1_u128, tulong ]
+    PROP (writable_share sh)
+    PARAMS (r_ptr; uint64_to_val a)
+    SEP (u128_at sh r_ptr r)
+  POST [ tint ]
+    EX r' : UInt128, EX carry : Z,
+    PROP (carry = 0 \/ carry = 1;
+          Z.add (u128_val r') (Z.mul carry (2^128)) =
+          Z.add (u128_val r) (u64_val a))
+    RETURN (Vint (Int.repr carry))
+    SEP (u128_at sh r_ptr r').
+
 (** [secp256k1_u128_rshift]: right-shift by 64 bits. *)
 Definition spec_secp256k1_u128_rshift : ident * funspec :=
   DECLARE _secp256k1_u128_rshift
@@ -329,6 +363,8 @@ Definition Gprog_int128_public : funspecs := [
   spec_secp256k1_u128_mul;
   spec_secp256k1_u128_accum_mul;
   spec_secp256k1_u128_accum_u64;
+  spec_secp256k1_u128_accum_mul_carry;
+  spec_secp256k1_u128_accum_u64_carry;
   spec_secp256k1_u128_rshift;
   spec_secp256k1_u128_to_u64;
   spec_secp256k1_u128_hi_u64;
