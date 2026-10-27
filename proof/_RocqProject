@@ -126,17 +126,11 @@ vst/modinv/verif/modinv64_var.v
 vst/scalar/verif/get_bits_limb32.v
 vst/scalar/verif/get_bits_var.v
 vst/scalar/verif/impl/scalar_check_overflow.v
-vst/scalar/verif/impl/scalar_extract.v
-vst/scalar/verif/impl/scalar_extract_fast.v
 vst/scalar/verif/impl/scalar_from_signed62.v
 vst/scalar/verif/impl/scalar_mul_512.v
-vst/scalar/verif/impl/scalar_muladd.v
-vst/scalar/verif/impl/scalar_muladd_fast.v
 vst/scalar/verif/impl/scalar_reduce.v
 vst/scalar/verif/impl/scalar_reduce_512.v
 vst/scalar/verif/impl/scalar_shift_limb.v
-vst/scalar/verif/impl/scalar_sumadd.v
-vst/scalar/verif/impl/scalar_sumadd_fast.v
 vst/scalar/verif/impl/scalar_to_signed62.v
 vst/scalar/verif/scalar_add.v
 vst/scalar/verif/scalar_cadd_bit.v

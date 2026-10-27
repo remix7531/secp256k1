@@ -30,10 +30,7 @@ Definition arithmetic_function_idents : list ident :=
    _secp256k1_scalar_get_b32; _secp256k1_scalar_is_zero;
    _secp256k1_scalar_negate; _secp256k1_scalar_half;
    _secp256k1_scalar_is_one; _secp256k1_scalar_is_high;
-   _secp256k1_scalar_cond_negate; _secp256k1_scalar_muladd;
-   _secp256k1_scalar_muladd_fast; _secp256k1_scalar_sumadd;
-   _secp256k1_scalar_sumadd_fast; _secp256k1_scalar_extract;
-   _secp256k1_scalar_extract_fast; _secp256k1_scalar_reduce_512;
+   _secp256k1_scalar_cond_negate; _secp256k1_scalar_reduce_512;
    _secp256k1_scalar_mul_512; _secp256k1_scalar_mul;
    _secp256k1_scalar_split_128; _secp256k1_scalar_eq;
    _secp256k1_scalar_shift_limb; _secp256k1_scalar_mul_shift_var;

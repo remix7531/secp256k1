@@ -8,14 +8,13 @@ Require Import secp256k1.vst.base.
 Require Import secp256k1.vst.helper.structs_int128.
 Require Import secp256k1.vst.helper.structs_scalar.
 Require Import secp256k1.theory.int128.int128.
-Require Import secp256k1.theory.int128.acc.
 Require Import secp256k1.theory.scalar.limbs.
 Require Import secp256k1.theory.integers.arithmetic.
 Require Import secp256k1.theory.integers.bits.
 Require Import secp256k1.vst.array_data_at.
 
 (* ================================================================= *)
-(** ** Unsigned model-to-C bridges -- [uint64_to_val] / [uint128_to_val] / [acc_to_val] / [uint256_to_val] / [scalar_to_val] / [uint512_to_val] / [bytes_to_val], plus the [val_to_*] reconstructors. *)
+(** ** Unsigned model-to-C bridges -- [uint64_to_val] / [uint128_to_val] / [uint256_to_val] / [scalar_to_val] / [uint512_to_val] / [bytes_to_val], plus the [val_to_*] reconstructors. *)
 
 (** Represent a [UInt64] as a C value. *)
 Definition uint64_to_val (x : UInt64) : val :=
@@ -26,13 +25,6 @@ Definition uint128_to_val (x : UInt128) : reptype t_secp256k1_u128 :=
   let v := u128_val x in
   (Vlong (Int64.repr (v mod 2^64)),
    Vlong (Int64.repr ((v / 2^64) mod 2^64))).
-
-(** Represent an [Acc] as a C struct (c0, c1, c2). *)
-Definition acc_to_val (x : Acc) : reptype t_secp256k1_acc :=
-  let v := acc_val x in
-  (Vlong (Int64.repr (v mod 2^64)),
-   (Vlong (Int64.repr ((v / 2^64) mod 2^64)),
-    Vlong (Int64.repr ((v / 2^128) mod 2^64)))).
 
 (** Represent a [UInt256] as a 4-limb C scalar struct. *)
 Definition uint256_to_val (x : UInt256) : reptype t_secp256k1_uint256 :=
@@ -82,13 +74,6 @@ Program Definition val_to_uint64 (z : Z)
 Program Definition val_to_uint128 (lo hi : Z)
   (Hlo : 0 <= lo < 2^64) (Hhi : 0 <= hi < 2^64) : UInt128 :=
   mkUInt128 (lo + hi * 2^64) _.
-Next Obligation. nia. Qed.
-
-(** Reconstruct an [Acc] from three 64-bit Z limbs (c0, c1, c2). *)
-Program Definition val_to_acc (c0 c1 c2 : Z)
-  (H0 : 0 <= c0 < 2^64) (H1 : 0 <= c1 < 2^64) (H2 : 0 <= c2 < 2^64)
-  : Acc :=
-  mkAcc (c0 + c1 * 2^64 + c2 * 2^128) _.
 Next Obligation. nia. Qed.
 
 (* ================================================================= *)
@@ -177,18 +162,6 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma acc_to_val_limb : forall x,
-  acc_to_val x =
-  (Vlong (Int64.repr (limb (2^64) (acc_val x) 0)),
-   (Vlong (Int64.repr (limb (2^64) (acc_val x) 1)),
-    Vlong (Int64.repr (limb (2^64) (acc_val x) 2)))).
-Proof.
-  intros. unfold acc_to_val.
-  rewrite (limb_fold2 (acc_val x)), (limb_fold1 (acc_val x)),
-          (limb_fold0 (acc_val x)).
-  reflexivity.
-Qed.
-
 Lemma uint256_to_val_limb : forall x,
   uint256_to_val x =
   [Vlong (Int64.repr (limb (2^64) (u256_val x) 0));
@@ -221,5 +194,5 @@ Proof.
   reflexivity.
 Qed.
 
-#[export] Hint Rewrite uint128_to_val_limb int128_to_val_limb acc_to_val_limb
+#[export] Hint Rewrite uint128_to_val_limb int128_to_val_limb
   uint256_to_val_limb uint512_to_val_limb : to_val_limb.

@@ -24,7 +24,7 @@ Require Import secp256k1.vst.helper.structs_scalar.
 Require Export secp256k1.vst.helper.repr.
 
 (* ================================================================= *)
-(** ** Unsigned-value notations -- [u64_at] / [u128_at] / [acc_at] / [u256_at] / [scalar_at] / [u512_at]. *)
+(** ** Unsigned-value notations -- [u64_at] / [u128_at] / [u256_at] / [scalar_at] / [u512_at]. *)
 
 Notation "'u64_at' sh p x" :=
   (data_at sh tulong (uint64_to_val x) p)
@@ -39,10 +39,6 @@ Notation "'u128_at' sh p x" :=
 Notation "'u128_at_' sh p" :=
   (data_at_ sh t_secp256k1_u128 p)
   (at level 20, sh at level 0, p at level 0).
-
-Notation "'acc_at' sh p x" :=
-  (data_at sh t_secp256k1_acc (acc_to_val x) p)
-  (at level 20, sh at level 0, p at level 0, x at level 0).
 
 Notation "'u256_at' sh p x" :=
   (data_at sh t_secp256k1_uint256 (uint256_to_val x) p)

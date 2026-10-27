@@ -11,6 +11,166 @@ Require Import secp256k1.vst.tactics.int128.
 Require Import secp256k1.vst.tactics.scalar.
 
 (* ================================================================= *)
+(** ** Accumulator lemmas -- [carry_bit_range] / [accum_carry_zero] / [extract_correct]. *)
+
+(** The C accumulator is a [secp256k1_uint128] [acc] plus a 64-bit temp [c2]
+    holding the bits above 128, so together they stand for the 192-bit value
+    [u128_val acc + c2 * 2^128].  The lemmas below are the per-macro facts
+    about that value. *)
+
+(** The carry returned by [secp256k1_u128_accum_mul_carry], as a range.  The
+    proof keeps one carry per [muladd] in context and [lia] case-splits on
+    every disjunction it sees: with the disjunctions the file did not finish
+    in 30 minutes, with the ranges it builds in about two. *)
+Lemma carry_bit_range : forall k : Z,
+  k = 0 \/ k = 1 ->
+  0 <= k <= 1.
+Proof.
+  intros k Hk.
+  lia.
+Qed.
+
+(** [muladd_fast]: when the exact sum fits in 128 bits, the carry returned by
+    [secp256k1_u128_accum_mul_carry] is zero. *)
+Lemma accum_carry_zero : forall (acc' : UInt128) (k s : Z),
+  0 <= k <= 1 ->
+  u128_val acc' + k * 2^128 = s ->
+  s < 2^128 ->
+  k = 0.
+Proof.
+  intros acc' k s Hk Hacc' Hs.
+  pose proof (u128_range acc').
+  lia.
+Qed.
+
+(** [extract]: the stored limb [to_u64(acc)] is the low 64 bits of the
+    192-bit value, and the reloaded accumulator [c2 * 2^64 + hi_u64(acc)] is
+    its quotient by [2^64]. *)
+Lemma extract_correct : forall (acc acc' : UInt128) (lo hi : UInt64) (c2 : Z),
+  lo = u128_lo acc ->
+  hi = u128_hi acc ->
+  u128_val acc' = u64_val hi + c2 * 2^64 ->
+  u64_val lo = (u128_val acc + c2 * 2^128) mod 2^64 /\
+  u128_val acc' = (u128_val acc + c2 * 2^128) / 2^64.
+Proof.
+  intros acc acc' lo hi c2 Hlo Hhi Hacc'.
+  rewrite Hacc', Hlo, Hhi, u128_lo_val, u128_hi_val.
+  replace (c2 * 2^128) with ((c2 * 2^64) * 2^64) by ring.
+  split.
+  - rewrite Z_mod_plus_full.
+    reflexivity.
+  - rewrite Z_div_plus_full by lia.
+    reflexivity.
+Qed.
+
+(* ================================================================= *)
+(** ** Macro tactics -- [muladd_step] / [muladd_fast_step] / [extract_step] / [extract_fast_step]. *)
+
+(** One tactic per accumulator macro of [src/scalar_4x64_impl.h].  Each
+    [muladd] call site first loads [a->d[i]] and [b->d[j]] into temps, and
+    each [extract] stores [to_u64(&acc)] through a temp into [l8[i]], so the
+    tactics step those statements too. *)
+
+(** [muladd(a, b)]: [carry = accum_mul_carry(&acc, a, b); c2 += carry].  The
+    [c2] temp stays in the form [Vlong (Int64.repr c)], with [c] the exact sum
+    of the carries since the last [extract]. *)
+Ltac muladd_step acc_ptr acc a b acc' k Hk Hacc' :=
+  let vret := fresh "vret" in
+  (* _t'i = a->d[i] *)
+  forward;
+  (* _t'j = b->d[j] *)
+  forward;
+  (* _t' = secp256k1_u128_accum_mul_carry(&acc, _t'i, _t'j) *)
+  forward_call (acc_ptr, acc, a, b, Tsh);
+  [ solve_param_match .. | Intros vret ];
+  destruct vret as [acc' k];
+  simpl fst in *;
+  simpl snd in *;
+  rename H into Hk;
+  apply carry_bit_range in Hk;
+  rename H0 into Hacc';
+  (* carry = _t' *)
+  forward;
+  (* c2 += carry *)
+  forward;
+  rewrite Int.signed_repr by rep_lia;
+  rewrite add64_repr;
+  deadvars!.
+
+(** [muladd_fast(a, b)]: [carry = accum_mul_carry(&acc, a, b)], with the
+    carry left unused. *)
+Ltac muladd_fast_step acc_ptr acc a b acc' k Hk Hacc' :=
+  let vret := fresh "vret" in
+  (* _t'i = a->d[i] *)
+  forward;
+  (* _t'j = b->d[j] *)
+  forward;
+  (* _t' = secp256k1_u128_accum_mul_carry(&acc, _t'i, _t'j) *)
+  forward_call (acc_ptr, acc, a, b, Tsh);
+  [ solve_param_match .. | Intros vret ];
+  destruct vret as [acc' k];
+  simpl fst in *;
+  simpl snd in *;
+  rename H into Hk;
+  apply carry_bit_range in Hk;
+  rename H0 into Hacc';
+  (* carry = _t' *)
+  forward;
+  deadvars!.
+
+(** [extract(n)]: [n = to_u64(&acc); load(&acc, c2, hi_u64(&acc)); c2 = 0].
+    Leaves [Hr] and [Hacc'] as stated by [extract_correct]. *)
+Ltac extract_step acc_ptr acc r Hr acc' Hacc' :=
+  let Hlo := fresh "Hlo" in
+  let hi := fresh "hi" in
+  let Hhi := fresh "Hhi" in
+  let Hc2 := fresh "Hc2" in
+  let Hload := fresh "Hload" in
+  (* _t' = secp256k1_u128_to_u64(&acc) *)
+  forward_call (acc_ptr, acc, Tsh);
+  Intros r;
+  rename H into Hlo;
+  (* l8[i] = _t' *)
+  forward;
+  (* _t'' = secp256k1_u128_hi_u64(&acc) *)
+  forward_call (acc_ptr, acc, Tsh);
+  Intros hi;
+  rename H into Hhi;
+  (* secp256k1_u128_load(&acc, c2, _t'') -- the c2 value is read off LOCAL *)
+  match goal with
+  | |- context [temp _c2 (Vlong (Int64.repr ?c2))] =>
+      assert (Hc2 : 0 <= c2 < 2^64) by rep_lia;
+      forward_call (acc_ptr, mkUInt64 c2 Hc2, hi, Tsh)
+  end;
+  Intros acc';
+  rename H into Hload;
+  simpl u64_val in Hload;
+  (* c2 = 0 *)
+  forward;
+  change (Int.signed (Int.repr 0)) with 0;
+  deadvars!;
+  destruct (extract_correct acc acc' r hi _ Hlo Hhi Hload) as [Hr Hacc'];
+  clear Hlo Hhi Hload Hc2 hi.
+
+(** [extract_fast(n)]: [n = to_u64(&acc); rshift(&acc, 64)], used where
+    [c2] is zero.  No [deadvars!] here: the last [extract_fast] ends the
+    function body, so its goal is the postcondition rather than a [semax]. *)
+Ltac extract_fast_step acc_ptr acc r Hr acc' Hacc' :=
+  let Hlo := fresh "Hlo" in
+  (* _t' = secp256k1_u128_to_u64(&acc) *)
+  forward_call (acc_ptr, acc, Tsh);
+  Intros r;
+  rename H into Hlo;
+  (* l8[i] = _t' *)
+  forward;
+  (* secp256k1_u128_rshift(&acc, 64) *)
+  forward_call (acc_ptr, acc, 64, Tsh);
+  Intros acc';
+  rename H into Hacc';
+  assert (Hr : u64_val r = u128_val acc mod 2^64) by (rewrite Hlo; apply u128_lo_val);
+  clear Hlo.
+
+(* ================================================================= *)
 (** ** secp256k1_scalar_mul_512 -- [l8 = a * b (full 512-bit product)]. *)
 
 Lemma body_secp256k1_scalar_mul_512:
@@ -21,29 +181,9 @@ Proof.
   rename SH0 into Hsh_a_readable.
   rename SH1 into Hsh_b_readable.
 
-  (* Establish field_compatible for the l8 array - needed for address matching *)
-  assert_PROP (field_compatible (tarray tulong 8) [] l8_ptr) as Hfc by entailer!.
-
-  (* Provide Inhabitant witnesses for deadvars! *)
+  (* Provide the Inhabitant witness for deadvars! *)
   assert (Inh_UInt512 : UInt512)
     by exact (mkUInt512 0 ltac:(lia)).
-  assert (Inh_UInt64_Acc : (UInt64 * Acc)%type)
-    by exact (mkUInt64 0 ltac:(lia), mkAcc 0 ltac:(lia)).
-
-  (* acc = {0, 0, 0} *)
-  forward. (* acc.c0 = 0 *)
-  forward. (* acc.c1 = 0 *)
-  forward. (* acc.c2 = 0 *)
-
-  (* Need to fold the expanded acc struct into acc_to_val form for forward_call *)
-  autorewrite with norm.
-
-  (* Introduce the zero accumulator *)
-  assert (Hacc_init_range : 0 <= 0 < 2^192) by lia.
-  set (acc_init := mkAcc 0 Hacc_init_range).
-  replace (Vlong (Int64.repr 0), (Vlong (Int64.repr 0), Vlong (Int64.repr 0)))
-    with (acc_to_val acc_init)
-    by (unfold acc_to_val, acc_init; reflexivity).
 
   (* Name the UInt64 limbs for all 8 scalar components *)
   set (a0 := u256_limb a 0).
@@ -73,319 +213,241 @@ Proof.
   pose proof (u64_mul_bound a3 b2) as Hab32.
   pose proof (u64_mul_bound a3 b3) as Hab33.
 
-  (* Pre-split the uninitialized l8 array into 8 individual slots.
-     This lets each extract call find its target via cancel. *)
-  sep_apply (unfold_data_at__tulong_8 sh_l l8_ptr Hfc).
-  Intros.
+  (* ===== Init: c2 = 0, acc = 0 ===== *)
 
-  (* ===== Round 0: l8[0] = a0*b0 (1 product, uses muladd_fast + extract_fast) ===== *)
+  forward. (* c2 = 0 *)
+  change (Int.signed (Int.repr 0)) with 0.
 
-  forward. (* a0 = a->d[0] *)
-  forward. (* b0 = b->d[0] *)
+  assert (Hzero_range : 0 <= 0 < 2^64) by lia.
+  (* init(0) -- secp256k1_u128_from_u64(&acc, 0) *)
+  forward_call (v_acc, mkUInt64 0 Hzero_range, Tsh).
+  Intros acc_init.
+  rename H into Hacc_init.
+  simpl u64_val in Hacc_init.
+  clear Hzero_range.
 
-  (* muladd_fast(&acc, a0, b0) *)
-  forward_call_muladd_fast v_acc acc_init a0 b0 acc0 Hacc0_post.
-  { (* overflow: 0 + a0*b0 < 2^128 *)
-    apply mul_u64_lt_u128; rep_lia. }
+  (* ===== Round 0: l8[0] = a0*b0 (muladd_fast + extract_fast) ===== *)
 
-  (* Track acc_val through round 0 *)
-  assert (Hacc0 : acc_val acc0 = u64_val a0 * u64_val b0).
-  { change (acc_val acc_init) with 0 in Hacc0_post.
-    rewrite Z.add_0_l in Hacc0_post. 
-    assumption. }
-  clear Hacc0_post.
+  (* muladd_fast(a->d[0], b->d[0]) *)
+  muladd_fast_step v_acc acc_init a0 b0 acc0 k0 Hk0 Hacc0.
 
-  (* extract_fast(&acc, &l8[0]) -- precondition: acc < 2^128 *)
-  forward_call_extract_fast v_acc acc0
-    (field_address (tarray tulong 8) [ArraySubsc 0] l8_ptr)
-    Tsh sh_l r0 carry0 Hr0_eq Hcarry0_eq.
-  { (* parameter matching *)
-    entailer!.
-    simpl firstn.
-    do 2 f_equal.
-    rewrite field_address_offset by auto with field_compatible.
-    simpl nested_field_offset.
-    rewrite isptr_offset_val_zero; auto. }
+  (* A single product fits in 128 bits, so the carry is zero *)
+  assert (Hk0_zero : k0 = 0).
+  { apply (accum_carry_zero acc0 k0 (u128_val acc_init + u64_val a0 * u64_val b0)).
+    - exact Hk0.
+    - exact Hacc0.
+    - rewrite Hacc_init.
+      apply mul_u64_lt_u128; rep_lia. }
+  subst k0.
 
-  assert (Hcarry0_ub : acc_val carry0 <= 2^64 - 2).
-  { rewrite Hcarry0_eq, Hacc0.
+  assert (HV0 : u128_val acc0 = u64_val a0 * u64_val b0) by lia.
+  clear Hacc0 Hk0 Hacc_init acc_init.
+
+  (* extract_fast(l8[0]) *)
+  extract_fast_step v_acc acc0 r0 Hr0 carry0 Hcarry0.
+
+  assert (Hcarry0_ub : u128_val carry0 <= 2^64 - 2).
+  { rewrite Hcarry0, HV0.
     apply (carry_div_ub_eq _ ((2^64 - 1) * (2^64 - 1)) _); lia. }
   clear Hab00.
 
-  (* ===== Round 1: l8[1] = a0*b1 + a1*b0 (2 products, uses muladd + extract) ===== *)
+  (* ===== Round 1: l8[1] = a0*b1 + a1*b0 (2 products) ===== *)
 
-  forward. (* a0 = a->d[0] *)
-  forward. (* b1 = b->d[1] *)
+  (* muladd(a->d[0], b->d[1]) *)
+  muladd_step v_acc carry0 a0 b1 acc1a k1a Hk1a Hacc1a.
 
-  (* muladd(&acc, a0, b1) *)
-  forward_call_muladd v_acc carry0 a0 b1 acc1a Hacc1a_eq.
+  (* muladd(a->d[1], b->d[0]) *)
+  muladd_step v_acc acc1a a1 b0 acc1 k1b Hk1b Hacc1.
 
-  forward. (* a1 = a->d[1] *)
-  forward. (* b0 = b->d[0] *)
+  (* The 192-bit value acc + c2 * 2^128 after round 1 *)
+  assert (HV1 : u128_val acc1 + (0 + k1a + k1b) * 2^128 =
+    u128_val carry0 + u64_val a0 * u64_val b1 + u64_val a1 * u64_val b0) by lia.
+  clear Hacc1a Hacc1.
 
-  (* muladd(&acc, a1, b0) *)
-  forward_call_muladd v_acc acc1a a1 b0 acc1 Hacc1_eq.
+  (* extract(l8[1]) *)
+  extract_step v_acc acc1 r1 Hr1 carry1 Hcarry1.
 
-  (* Full chain for round 1 *)
-  assert (Hacc1 : acc_val acc1 =
-    acc_val carry0 + u64_val a0 * u64_val b1 + u64_val a1 * u64_val b0).
-  { rewrite Hacc1_eq, Hacc1a_eq. lia. }
-
-  (* extract(&acc, &l8[1]) *)
-  forward_call_extract v_acc acc1
-    (field_address (tarray tulong 8) [ArraySubsc 1] l8_ptr)
-    Tsh sh_l r1 carry1 Hr1_eq Hcarry1_eq.
-
-  assert (Hcarry1_ub : acc_val carry1 <= 2 * 2^64 - 3).
-  { rewrite Hcarry1_eq, Hacc1.
+  assert (Hcarry1_ub : u128_val carry1 <= 2 * 2^64 - 3).
+  { rewrite Hcarry1, HV1.
     apply (carry_div_ub_eq _ ((2^64 - 2) + 2 * ((2^64 - 1) * (2^64 - 1))) _); lia. }
   clear Hab01 Hab10.
 
   (* ===== Round 2: l8[2] = a0*b2 + a1*b1 + a2*b0 (3 products) ===== *)
 
-  forward. (* a0 = a->d[0] *)
-  forward. (* b2 = b->d[2] *)
+  (* muladd(a->d[0], b->d[2]) *)
+  muladd_step v_acc carry1 a0 b2 acc2a k2a Hk2a Hacc2a.
 
-  (* muladd(&acc, a0, b2) *)
-  forward_call_muladd v_acc carry1 a0 b2 acc2a Hacc2a_eq.
+  (* muladd(a->d[1], b->d[1]) *)
+  muladd_step v_acc acc2a a1 b1 acc2b k2b Hk2b Hacc2b.
 
-  forward. (* a1 = a->d[1] *)
-  forward. (* b1 = b->d[1] *)
+  (* muladd(a->d[2], b->d[0]) *)
+  muladd_step v_acc acc2b a2 b0 acc2 k2c Hk2c Hacc2.
 
-  (* muladd(&acc, a1, b1) *)
-  forward_call_muladd v_acc acc2a a1 b1 acc2b Hacc2b_eq.
+  (* The 192-bit value acc + c2 * 2^128 after round 2 *)
+  assert (HV2 : u128_val acc2 + (0 + k2a + k2b + k2c) * 2^128 =
+    u128_val carry1 + u64_val a0 * u64_val b2 + u64_val a1 * u64_val b1
+    + u64_val a2 * u64_val b0) by lia.
+  clear Hacc2a Hacc2b Hacc2.
 
-  forward. (* a2 = a->d[2] *)
-  forward. (* b0 = b->d[0] *)
+  (* extract(l8[2]) *)
+  extract_step v_acc acc2 r2 Hr2 carry2 Hcarry2.
 
-  (* muladd(&acc, a2, b0) *)
-  forward_call_muladd v_acc acc2b a2 b0 acc2 Hacc2_eq.
-
-  (* Full chain for round 2 *)
-  assert (Hacc2 : acc_val acc2 =
-    acc_val carry1 + u64_val a0 * u64_val b2 + u64_val a1 * u64_val b1 + u64_val a2 * u64_val b0).
-  { rewrite Hacc2_eq, Hacc2b_eq, Hacc2a_eq. lia. }
-
-  (* extract(&acc, &l8[2]) *)
-  forward_call_extract v_acc acc2
-    (field_address (tarray tulong 8) [ArraySubsc 2] l8_ptr)
-    Tsh sh_l r2 carry2 Hr2_eq Hcarry2_eq.
-
-  assert (Hcarry2_ub : acc_val carry2 <= 3 * 2^64 - 4).
-  { rewrite Hcarry2_eq, Hacc2.
+  assert (Hcarry2_ub : u128_val carry2 <= 3 * 2^64 - 4).
+  { rewrite Hcarry2, HV2.
     apply (carry_div_ub_eq _ ((2 * 2^64 - 3) + 3 * ((2^64 - 1) * (2^64 - 1))) _); lia. }
   clear Hab02 Hab11 Hab20.
 
   (* ===== Round 3: l8[3] = a0*b3 + a1*b2 + a2*b1 + a3*b0 (4 products) ===== *)
 
-  forward. (* a0 = a->d[0] *)
-  forward. (* b3 = b->d[3] *)
+  (* muladd(a->d[0], b->d[3]) *)
+  muladd_step v_acc carry2 a0 b3 acc3a k3a Hk3a Hacc3a.
 
-  (* muladd(&acc, a0, b3) *)
-  forward_call_muladd v_acc carry2 a0 b3 acc3a Hacc3a_eq.
+  (* muladd(a->d[1], b->d[2]) *)
+  muladd_step v_acc acc3a a1 b2 acc3b k3b Hk3b Hacc3b.
 
-  forward. (* a1 = a->d[1] *)
-  forward. (* b2 = b->d[2] *)
+  (* muladd(a->d[2], b->d[1]) *)
+  muladd_step v_acc acc3b a2 b1 acc3c k3c Hk3c Hacc3c.
 
-  (* muladd(&acc, a1, b2) *)
-  forward_call_muladd v_acc acc3a a1 b2 acc3b Hacc3b_eq.
+  (* muladd(a->d[3], b->d[0]) *)
+  muladd_step v_acc acc3c a3 b0 acc3 k3d Hk3d Hacc3.
 
-  forward. (* a2 = a->d[2] *)
-  forward. (* b1 = b->d[1] *)
+  (* The 192-bit value acc + c2 * 2^128 after round 3 *)
+  assert (HV3 : u128_val acc3 + (0 + k3a + k3b + k3c + k3d) * 2^128 =
+    u128_val carry2 + u64_val a0 * u64_val b3 + u64_val a1 * u64_val b2
+    + u64_val a2 * u64_val b1 + u64_val a3 * u64_val b0) by lia.
+  clear Hacc3a Hacc3b Hacc3c Hacc3.
 
-  (* muladd(&acc, a2, b1) *)
-  forward_call_muladd v_acc acc3b a2 b1 acc3c Hacc3c_eq.
+  (* extract(l8[3]) *)
+  extract_step v_acc acc3 r3 Hr3 carry3 Hcarry3.
 
-  forward. (* a3 = a->d[3] *)
-  forward. (* b0 = b->d[0] *)
-
-  (* muladd(&acc, a3, b0) *)
-  forward_call_muladd v_acc acc3c a3 b0 acc3 Hacc3_eq.
-
-  (* Full chain for round 3 *)
-  assert (Hacc3 : acc_val acc3 =
-    acc_val carry2 + u64_val a0 * u64_val b3 + u64_val a1 * u64_val b2
-    + u64_val a2 * u64_val b1 + u64_val a3 * u64_val b0).
-  { rewrite Hacc3_eq, Hacc3c_eq, Hacc3b_eq, Hacc3a_eq. lia. }
-
-  (* extract(&acc, &l8[3]) *)
-  forward_call_extract v_acc acc3
-    (field_address (tarray tulong 8) [ArraySubsc 3] l8_ptr)
-    Tsh sh_l r3 carry3 Hr3_eq Hcarry3_eq.
-
-  assert (Hcarry3_ub : acc_val carry3 <= 4 * 2^64 - 5).
-  { rewrite Hcarry3_eq, Hacc3.
+  assert (Hcarry3_ub : u128_val carry3 <= 4 * 2^64 - 5).
+  { rewrite Hcarry3, HV3.
     apply (carry_div_ub_eq _ ((3 * 2^64 - 4) + 4 * ((2^64 - 1) * (2^64 - 1))) _); lia. }
   clear Hab03 Hab12 Hab21 Hab30.
 
   (* ===== Round 4: l8[4] = a1*b3 + a2*b2 + a3*b1 (3 products) ===== *)
 
-  forward. (* a1 = a->d[1] *)
-  forward. (* b3 = b->d[3] *)
+  (* muladd(a->d[1], b->d[3]) *)
+  muladd_step v_acc carry3 a1 b3 acc4a k4a Hk4a Hacc4a.
 
-  (* muladd(&acc, a1, b3) *)
-  forward_call_muladd v_acc carry3 a1 b3 acc4a Hacc4a_eq.
+  (* muladd(a->d[2], b->d[2]) *)
+  muladd_step v_acc acc4a a2 b2 acc4b k4b Hk4b Hacc4b.
 
-  forward. (* a2 = a->d[2] *)
-  forward. (* b2 = b->d[2] *)
+  (* muladd(a->d[3], b->d[1]) *)
+  muladd_step v_acc acc4b a3 b1 acc4 k4c Hk4c Hacc4.
 
-  (* muladd(&acc, a2, b2) *)
-  forward_call_muladd v_acc acc4a a2 b2 acc4b Hacc4b_eq.
+  (* The 192-bit value acc + c2 * 2^128 after round 4 *)
+  assert (HV4 : u128_val acc4 + (0 + k4a + k4b + k4c) * 2^128 =
+    u128_val carry3 + u64_val a1 * u64_val b3 + u64_val a2 * u64_val b2
+    + u64_val a3 * u64_val b1) by lia.
+  clear Hacc4a Hacc4b Hacc4.
 
-  forward. (* a3 = a->d[3] *)
-  forward. (* b1 = b->d[1] *)
+  (* extract(l8[4]) *)
+  extract_step v_acc acc4 r4 Hr4 carry4 Hcarry4.
 
-  (* muladd(&acc, a3, b1) *)
-  forward_call_muladd v_acc acc4b a3 b1 acc4 Hacc4_eq.
-
-  (* Full chain for round 4 *)
-  assert (Hacc4 : acc_val acc4 =
-    acc_val carry3 + u64_val a1 * u64_val b3 + u64_val a2 * u64_val b2
-    + u64_val a3 * u64_val b1).
-  { rewrite Hacc4_eq, Hacc4b_eq, Hacc4a_eq. lia. }
-
-  (* extract(&acc, &l8[4]) *)
-  forward_call_extract v_acc acc4
-    (field_address (tarray tulong 8) [ArraySubsc 4] l8_ptr)
-    Tsh sh_l r4 carry4 Hr4_eq Hcarry4_eq.
-
-  assert (Hcarry4_ub : acc_val carry4 <= 3 * 2^64 - 3).
-  { rewrite Hcarry4_eq, Hacc4.
+  assert (Hcarry4_ub : u128_val carry4 <= 3 * 2^64 - 3).
+  { rewrite Hcarry4, HV4.
     apply (carry_div_ub_eq _ ((4 * 2^64 - 5) + 3 * ((2^64 - 1) * (2^64 - 1))) _); lia. }
   clear Hab13 Hab22 Hab31.
 
   (* ===== Round 5: l8[5] = a2*b3 + a3*b2 (2 products) ===== *)
 
-  forward. (* a2 = a->d[2] *)
-  forward. (* b3 = b->d[3] *)
+  (* muladd(a->d[2], b->d[3]) *)
+  muladd_step v_acc carry4 a2 b3 acc5a k5a Hk5a Hacc5a.
 
-  (* muladd(&acc, a2, b3) *)
-  forward_call_muladd v_acc carry4 a2 b3 acc5a Hacc5a_eq.
+  (* muladd(a->d[3], b->d[2]) *)
+  muladd_step v_acc acc5a a3 b2 acc5 k5b Hk5b Hacc5.
 
-  forward. (* a3 = a->d[3] *)
-  forward. (* b2 = b->d[2] *)
+  (* The 192-bit value acc + c2 * 2^128 after round 5 *)
+  assert (HV5 : u128_val acc5 + (0 + k5a + k5b) * 2^128 =
+    u128_val carry4 + u64_val a2 * u64_val b3 + u64_val a3 * u64_val b2) by lia.
+  clear Hacc5a Hacc5.
 
-  (* muladd(&acc, a3, b2) *)
-  forward_call_muladd v_acc acc5a a3 b2 acc5 Hacc5_eq.
+  (* extract(l8[5]) *)
+  extract_step v_acc acc5 r5 Hr5 carry5 Hcarry5.
 
-  (* Full chain for round 5 *)
-  assert (Hacc5 : acc_val acc5 =
-    acc_val carry4 + u64_val a2 * u64_val b3 + u64_val a3 * u64_val b2).
-  { rewrite Hacc5_eq, Hacc5a_eq. lia. }
-
-  (* extract(&acc, &l8[5]) *)
-  forward_call_extract v_acc acc5
-    (field_address (tarray tulong 8) [ArraySubsc 5] l8_ptr)
-    Tsh sh_l r5 carry5 Hr5_eq Hcarry5_eq.
-
-  assert (Hcarry5_ub : acc_val carry5 <= 2 * 2^64 - 2).
-  { rewrite Hcarry5_eq, Hacc5.
+  assert (Hcarry5_ub : u128_val carry5 <= 2 * 2^64 - 2).
+  { rewrite Hcarry5, HV5.
     apply (carry_div_ub_eq _ ((3 * 2^64 - 3) + 2 * ((2^64 - 1) * (2^64 - 1))) _); lia. }
   clear Hab23 Hab32.
 
-  (* ===== Round 6: l8[6],l8[7] = a3*b3 (1 product, uses muladd_fast + extract_fast + store) ===== *)
+  (* ===== Round 6: l8[6], l8[7] = a3*b3 (muladd_fast + two extract_fast) ===== *)
 
-  forward. (* a3 = a->d[3] *)
-  forward. (* b3 = b->d[3] *)
+  (* muladd_fast(a->d[3], b->d[3]) *)
+  muladd_fast_step v_acc carry5 a3 b3 acc6 k6 Hk6 Hacc6.
 
-  (* muladd_fast(&acc, a3, b3) -- precondition: acc + a3*b3 < 2^128 *)
-  forward_call_muladd_fast v_acc carry5 a3 b3 acc6 Hacc6_eq.
+  (* The round 5 carry bound keeps this sum below 2^128, so the carry is zero *)
+  assert (Hk6_zero : k6 = 0).
+  { apply (accum_carry_zero acc6 k6 (u128_val carry5 + u64_val a3 * u64_val b3)).
+    - exact Hk6.
+    - exact Hacc6.
+    - lia. }
+  subst k6.
 
-  (* Full chain for round 6 *)
-  assert (Hacc6 : acc_val acc6 = acc_val carry5 + u64_val a3 * u64_val b3).
-  { exact Hacc6_eq. }
+  assert (HV6 : u128_val acc6 = u128_val carry5 + u64_val a3 * u64_val b3) by lia.
+  clear Hacc6 Hk6 Hab33.
 
-  (* extract_fast(&acc, &l8[6]) -- precondition: acc < 2^128 *)
-  forward_call_extract_fast v_acc acc6
-    (field_address (tarray tulong 8) [ArraySubsc 6] l8_ptr)
-    Tsh sh_l r6 carry6 Hr6_eq Hcarry6_eq.
-  clear Hab33.
+  (* extract_fast(l8[6]) *)
+  extract_fast_step v_acc acc6 r6 Hr6 carry6 Hcarry6.
 
-  (* l8[7] = acc.c0: first read acc.c0 into temp *)
-  forward.
-  (* Bridge the slot 7 data_at_ tulong back to field_at_ so [forward] can
-     find it; the equation is provided by [slot_field_at__eq_data_at_]. *)
-  rewrite <- slot_field_at__eq_data_at_.
-  forward. (* l8[7] = acc.c0 *)
+  (* extract_fast(l8[7]) *)
+  extract_fast_step v_acc carry6 r7 Hr7 carry7 Hcarry7.
 
-  (* ===== Cleanup: reassemble l8[0..7] array and strip VST machinery ===== *)
+  (* ===== Cleanup: provide witness and strip VST machinery ===== *)
 
-  (* Provide the existential witness *)
   Exists (mul_256 a b).
   entailer!.
-
-  (* Fold the 8 singleton data_ats into the array data_at. [sep_apply]
-     infers all args and bridges the slot-7 field_at/data_at coercion. *)
-  sep_apply fold_data_at_tulong_8.
 
   (* Reduce to list equality *)
   apply derives_refl'.
   f_equal.
 
+  (* The eight stores into the default array give the list of the limbs *)
+  transitivity [uint64_to_val r0; uint64_to_val r1; uint64_to_val r2;
+                uint64_to_val r3; uint64_to_val r4; uint64_to_val r5;
+                uint64_to_val r6; uint64_to_val r7].
+  { reflexivity. }
+
   (* Remove all VST/pointer/bounds context -- keep only pure Z facts *)
   clear - a b
-    acc0 Hacc0
-    carry0 Hcarry0_eq
-    acc1 Hacc1
-    carry1 Hcarry1_eq
-    acc2 Hacc2
-    carry2 Hcarry2_eq
-    acc3 Hacc3
-    carry3 Hcarry3_eq
-    acc4 Hacc4
-    carry4 Hcarry4_eq
-    acc5 Hacc5
-    carry5 Hcarry5_eq
-    acc6 Hacc6
-    carry6 Hcarry6_eq.
+    HV0 Hcarry0 Hr0
+    HV1 Hcarry1 Hr1
+    HV2 Hcarry2 Hr2
+    HV3 Hcarry3 Hr3
+    HV4 Hcarry4 Hr4
+    HV5 Hcarry5 Hr5
+    HV6 Hcarry6 Hr6
+    Hr7.
 
   (* Strip Vlong/Int64.repr wrappers *)
   unfold uint512_to_val, uint64_to_val.
-  refold_div.
-  simpl u128_val.
-  unfold acc_lo.
-  simpl u64_val.
-  change (Z.pow_pos 2 64) with (2^64).
-  set (B := 2^64) in *.
+  rewrite Hr0, Hr1, Hr2, Hr3, Hr4, Hr5, Hr6, Hr7.
 
   (* ===== Postcondition: prove mul_256 correctness via schoolbook lemma ===== *)
-  pose proof (schoolbook_mul_4x4 B ltac:(unfold B; lia)
+
+  pose proof (schoolbook_mul_4x4 (2^64) ltac:(lia)
     (u64_val a0) (u64_val a1) (u64_val a2) (u64_val a3)
     (u64_val b0) (u64_val b1) (u64_val b2) (u64_val b3)
-    ltac:(pose proof (u64_range a0); lia)
-    ltac:(pose proof (u64_range a1); lia)
-    ltac:(pose proof (u64_range a2); lia)
-    ltac:(pose proof (u64_range a3); lia)
-    ltac:(pose proof (u64_range b0); lia)
-    ltac:(pose proof (u64_range b1); lia)
-    ltac:(pose proof (u64_range b2); lia)
-    ltac:(pose proof (u64_range b3); lia)
-    (acc_val acc0) Hacc0
-    (acc_val carry0) Hcarry0_eq
-    (acc_val acc1) Hacc1
-    (acc_val carry1) Hcarry1_eq
-    (acc_val acc2) Hacc2
-    (acc_val carry2) Hcarry2_eq
-    (acc_val acc3) Hacc3
-    (acc_val carry3) Hcarry3_eq
-    (acc_val acc4) Hacc4
-    (acc_val carry4) Hcarry4_eq
-    (acc_val acc5) Hacc5
-    (acc_val carry5) Hcarry5_eq
-    (acc_val acc6) Hacc6
-    (acc_val carry6) Hcarry6_eq
+    ltac:(rep_lia) ltac:(rep_lia) ltac:(rep_lia) ltac:(rep_lia)
+    ltac:(rep_lia) ltac:(rep_lia) ltac:(rep_lia) ltac:(rep_lia)
+    _ HV0 _ Hcarry0
+    _ HV1 _ Hcarry1
+    _ HV2 _ Hcarry2
+    _ HV3 _ Hcarry3
+    _ HV4 _ Hcarry4
+    _ HV5 _ Hcarry5
+    _ HV6 _ Hcarry6
   ) as Hschoolbook.
 
   (* The schoolbook lemma talks about eval4, connect to u256_val *)
-  assert (Heval_a : eval4 B (u64_val a0) (u64_val a1) (u64_val a2) (u64_val a3) = u256_val a)
+  assert (Heval_a : eval4 (2^64) (u64_val a0) (u64_val a1) (u64_val a2) (u64_val a3) = u256_val a)
     by (subst a0 a1 a2 a3; exact (u256_as_eval4 a)).
-  assert (Heval_b : eval4 B (u64_val b0) (u64_val b1) (u64_val b2) (u64_val b3) = u256_val b)
+  assert (Heval_b : eval4 (2^64) (u64_val b0) (u64_val b1) (u64_val b2) (u64_val b3) = u256_val b)
     by (subst b0 b1 b2 b3; exact (u256_as_eval4 b)).
 
   rewrite Heval_a, Heval_b in Hschoolbook.
   unfold mul_256.
   simpl u512_val.
   destruct Hschoolbook as (-> & -> & -> & -> & -> & -> & -> & ->).
-  subst B.
   reflexivity.
 Qed.

@@ -4,9 +4,8 @@
 
 (** Mirrors [src/scalar_4x64_impl.h]: the funspecs here are for the [static]
     helpers that are NOT part of the public [src/scalar.h] surface -- the
-    accumulator primitives ([muladd] / [sumadd] / [extract], with their [_fast]
-    variants), the overflow-check + reduction pipeline ([check_overflow],
-    [reduce], [mul_512], [reduce_512]), the rounded-shift limb helper
+    overflow-check + reduction pipeline ([check_overflow], [reduce],
+    [mul_512], [reduce_512]), the rounded-shift limb helper
     ([shift_limb]), and the scalar <-> signed62 bridge ([to_signed62] /
     [from_signed62]).  The public scalar API (including [secp256k1_scalar_mul],
     [inverse], [inverse_var]) is specified in [vst/scalar/contract.v], whose
@@ -21,110 +20,9 @@ Require secp256k1.specification.
 Import specification.Math.
 Import specification.Math.integer_bytes.
 Require Import secp256k1.theory.int128.int128.
-Require Import secp256k1.theory.int128.acc.
 Require Import secp256k1.theory.scalar.limbs.
 Require Import secp256k1.vst.helper.signed62.
 Require Import secp256k1.vst.helper.notations.
-
-(* ================================================================= *)
-(** ** Accumulator funspecs -- [muladd] / [sumadd] / [extract] (+ _fast variants). *)
-
-(** [muladd]: add a*b to acc. c2 must never overflow. *)
-Definition spec_secp256k1_scalar_muladd : ident * funspec :=
-  DECLARE _secp256k1_scalar_muladd
-  WITH acc_ptr : val, acc : Acc, a : UInt64, b : UInt64, sh : share
-  PRE [ tptr t_secp256k1_acc, tulong, tulong ]
-    PROP (writable_share sh;
-          acc_val acc + Z.mul (u64_val a) (u64_val b) < 2^192)
-    PARAMS (acc_ptr; uint64_to_val a; uint64_to_val b)
-    SEP (acc_at sh acc_ptr acc)
-  POST [ tvoid ]
-    EX acc' : Acc,
-    PROP (acc_val acc' = Z.add (acc_val acc) (Z.mul (u64_val a) (u64_val b)))
-    RETURN ()
-    SEP (acc_at sh acc_ptr acc').
-
-(** [muladd_fast]: add a*b to (c0,c1). c1 must never overflow. *)
-Definition spec_secp256k1_scalar_muladd_fast : ident * funspec :=
-  DECLARE _secp256k1_scalar_muladd_fast
-  WITH acc_ptr : val, acc : Acc, a : UInt64, b : UInt64, sh : share
-  PRE [ tptr t_secp256k1_acc, tulong, tulong ]
-    PROP (writable_share sh;
-          acc_val acc + Z.mul (u64_val a) (u64_val b) < 2^128)
-    PARAMS (acc_ptr; uint64_to_val a; uint64_to_val b)
-    SEP (acc_at sh acc_ptr acc)
-  POST [ tvoid ]
-    EX acc' : Acc,
-    PROP (acc_val acc' = Z.add (acc_val acc) (Z.mul (u64_val a) (u64_val b)))
-    RETURN ()
-    SEP (acc_at sh acc_ptr acc').
-
-(** [sumadd]: add a to acc. c2 must never overflow. *)
-Definition spec_secp256k1_scalar_sumadd : ident * funspec :=
-  DECLARE _secp256k1_scalar_sumadd
-  WITH acc_ptr : val, acc : Acc, a : UInt64, sh : share
-  PRE [ tptr t_secp256k1_acc, tulong ]
-    PROP (writable_share sh;
-          Z.add (acc_val acc) (u64_val a) < 2^192)
-    PARAMS (acc_ptr; uint64_to_val a)
-    SEP (acc_at sh acc_ptr acc)
-  POST [ tvoid ]
-    EX acc' : Acc,
-    PROP (acc_val acc' = Z.add (acc_val acc) (u64_val a))
-    RETURN ()
-    SEP (acc_at sh acc_ptr acc').
-
-(** [sumadd_fast]: add a to (c0,c1). c1 must never overflow, c2 must be zero. *)
-Definition spec_secp256k1_scalar_sumadd_fast : ident * funspec :=
-  DECLARE _secp256k1_scalar_sumadd_fast
-  WITH acc_ptr : val, acc : Acc, a : UInt64, sh : share
-  PRE [ tptr t_secp256k1_acc, tulong ]
-    PROP (writable_share sh;
-          Z.add (acc_val acc) (u64_val a) < 2^128)
-    PARAMS (acc_ptr; uint64_to_val a)
-    SEP (acc_at sh acc_ptr acc)
-  POST [ tvoid ]
-    EX acc' : Acc,
-    PROP (acc_val acc' = Z.add (acc_val acc) (u64_val a))
-    RETURN ()
-    SEP (acc_at sh acc_ptr acc').
-
-(** [extract]: extract lowest 64 bits, shift acc right by 64. *)
-Definition spec_secp256k1_scalar_extract : ident * funspec :=
-  DECLARE _secp256k1_scalar_extract
-  WITH acc_ptr : val, acc : Acc, n_ptr : val, sh : share, sh_n : share
-  PRE [ tptr t_secp256k1_acc, tptr tulong ]
-    PROP (writable_share sh;
-          writable_share sh_n)
-    PARAMS (acc_ptr; n_ptr)
-    SEP (acc_at sh acc_ptr acc;
-         u64_at_ sh_n n_ptr)
-  POST [ tvoid ]
-    EX n : UInt64, EX acc' : Acc,
-    PROP (n = acc_lo acc;
-          acc_val acc' = acc_val acc / 2^64)
-    RETURN ()
-    SEP (acc_at sh acc_ptr acc';
-         u64_at sh_n n_ptr n).
-
-(** [extract_fast]: extract lowest 64 bits, c2 required zero. *)
-Definition spec_secp256k1_scalar_extract_fast : ident * funspec :=
-  DECLARE _secp256k1_scalar_extract_fast
-  WITH acc_ptr : val, acc : Acc, n_ptr : val, sh : share, sh_n : share
-  PRE [ tptr t_secp256k1_acc, tptr tulong ]
-    PROP (writable_share sh;
-          writable_share sh_n;
-          acc_val acc < 2^128)
-    PARAMS (acc_ptr; n_ptr)
-    SEP (acc_at sh acc_ptr acc;
-         u64_at_ sh_n n_ptr)
-  POST [ tvoid ]
-    EX n : UInt64, EX acc' : Acc,
-    PROP (n = acc_lo acc;
-          acc_val acc' = acc_val acc / 2^64)
-    RETURN ()
-    SEP (acc_at sh acc_ptr acc';
-         u64_at sh_n n_ptr n).
 
 (* ================================================================= *)
 (** ** Overflow check and reduction -- [check_overflow] [a >= N] / [reduce] [+ ovf*(2^256-N)]. *)
@@ -295,12 +193,6 @@ Definition spec_secp256k1_scalar_from_signed62 : ident * funspec :=
     the safegcd drivers call. *)
 
 Definition Gprog_scalar_impl : funspecs := [
-  spec_secp256k1_scalar_muladd;
-  spec_secp256k1_scalar_muladd_fast;
-  spec_secp256k1_scalar_sumadd;
-  spec_secp256k1_scalar_sumadd_fast;
-  spec_secp256k1_scalar_extract;
-  spec_secp256k1_scalar_extract_fast;
   spec_secp256k1_scalar_check_overflow;
   spec_secp256k1_scalar_reduce;
   spec_secp256k1_scalar_mul_512;

@@ -4,9 +4,9 @@
     SPDX-License-Identifier: MIT *)
 
 (** Everything scalar-specific that the old monolithic automation carried:
-    the [N]/[N_C] rep_lia hints and [N_C_*_u64] wrappers, the muladd/sumadd
-    VST carry-bridge lemmas, the C-expression lemmas for [~N_i (+1)], and the
-    scalar [forward_call_*] wrappers with their parameter-matching solvers. *)
+    the [N]/[N_C] rep_lia hints and [N_C_*_u64] wrappers, the C-expression
+    lemmas for [~N_i (+1)], and the scalar [forward_call_*] wrappers with
+    their parameter-matching solvers. *)
 
 Require Export secp256k1.vst.tactics.core.
 Require Import secp256k1.vst.helper.repr.
@@ -72,7 +72,7 @@ Qed.
 (** Solve the parameter-matching [firstn ... = [...]] equation that
     appears when the C-representation uses inline splits but the spec
     arguments are [u256_limb x k] / [uint64_to_val _].  Rewrites with
-    the bridge lemmas [uint128/acc/uint256/uint512_to_val_limb] to
+    the bridge lemmas [uint128/uint256/uint512_to_val_limb] to
     convert inline splits to [limb (2^64) v i] form. *)
 Ltac solve_param_match :=
   entailer!;
@@ -80,43 +80,6 @@ Ltac solve_param_match :=
   unfold u256_limb, uint64_to_val;
   simpl;
   reflexivity.
-
-(** Accumulator helpers (muladd, muladd_fast, sumadd, sumadd_fast). *)
-
-Ltac forward_call_muladd acc_ptr acc a b acc' Hacc' :=
-  forward_call (acc_ptr, acc, a, b, Tsh);
-  [ try solve_param_match; try (simpl; rep_lia) .. | Intros acc'; rename H into Hacc'; try deadvars!].
-
-Ltac forward_call_muladd_fast acc_ptr acc a b acc' Hacc' :=
-  forward_call (acc_ptr, acc, a, b, Tsh);
-  [ try solve_param_match; try (simpl; rep_lia) .. | Intros acc'; rename H into Hacc'; try deadvars!].
-
-Ltac forward_call_sumadd acc_ptr acc a acc' Hacc' :=
-  forward_call (acc_ptr, acc, a, Tsh);
-  [ try solve_param_match; try (simpl; rep_lia) .. | Intros acc'; rename H into Hacc'; try deadvars!].
-
-Ltac forward_call_sumadd_fast acc_ptr acc a acc' Hacc' :=
-  forward_call (acc_ptr, acc, a, Tsh);
-  [ try solve_param_match; try (simpl; rep_lia) .. | Intros acc'; rename H into Hacc'; try deadvars!].
-
-(** Extract helpers (extract, extract_fast).
-    Returns a [(UInt64 * Acc)] pair that is destructured. *)
-
-Ltac forward_call_extract acc_ptr acc n_ptr sh sh_n lo carry Hlo Hcarry :=
-  forward_call (acc_ptr, acc, n_ptr, sh, sh_n);
-  [ try (simpl; rep_lia) .. | let vret := fresh "vret" in
-        Intros vret; destruct vret as [lo carry];
-        rename H into Hlo; rename H0 into Hcarry;
-        simpl fst in *; simpl snd in *;
-        try deadvars!].
-
-Ltac forward_call_extract_fast acc_ptr acc n_ptr sh sh_n lo carry Hlo Hcarry :=
-  forward_call (acc_ptr, acc, n_ptr, sh, sh_n);
-  [ try (simpl; rep_lia) .. | let vret := fresh "vret" in
-        Intros vret; destruct vret as [lo carry];
-        rename H into Hlo; rename H0 into Hcarry;
-        simpl fst in *; simpl snd in *;
-        try deadvars!].
 
 (** Higher-level functions. *)
 
@@ -138,15 +101,19 @@ Ltac forward_call_scalar_reduce_512 r_ptr l_ptr l sh_r sh_l r' Hr' :=
 (* ================================================================= *)
 (** ** scalar_reduce expr matching -- [solve_reduce_expr_match] for [overflow * N_C_i].
 
-    Solves the VST parameter-matching goal for [(uint64_t)overflow * N_C_i]
+    Solves the VST parameter-matching goal for [overflow * N_C_i]
     expressions that arise in [secp256k1_scalar_reduce].  Tries each
-    constant in order: [N_C_0], [N_C_1], [N_C_2]. *)
+    constant in order: [N_C_0], [N_C_1], [N_C_2].  [overflow] is an
+    [unsigned int]: against the [uint64_t] constants [N_C_0] and [N_C_1] the
+    product is 64-bit, but [N_C_2] is the [int] literal 1, so that product is
+    32-bit and only widened when passed, hence [Int.unsigned_repr]. *)
 
-(** Solve VST expression-matching goals for [(uint64_t)overflow * N_C_i]. *)
+(** Solve VST expression-matching goals for [overflow * N_C_i]. *)
 Ltac solve_reduce_expr_match :=
   entailer!; simpl; unfold uint64_to_val; simpl u64_val;
   f_equal; f_equal; f_equal; simpl;
   first
     [ rewrite N_C_0_expr; apply Int64_mul_repr; rep_lia
     | rewrite N_C_1_expr; apply Int64_mul_repr; rep_lia
-    | unfold N_C_2; rewrite Z.mul_1_r; reflexivity ].
+    | unfold N_C_2; rewrite Z.mul_1_r, ?Int.unsigned_repr by rep_lia;
+      reflexivity ].

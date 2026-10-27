@@ -47,7 +47,7 @@ Proof.
 
     rewrite limb_fold0. reflexivity. }
 
-  (* secp256k1_u128_accum_u64(&t, (uint64_t)overflow * N_C_0) *)
+  (* secp256k1_u128_accum_u64(&t, overflow * N_C_0) *)
   forward_call_u128_accum_u64 v_t t_init (mkUInt64 (overflow * N_C_0) Hov0) Tsh acc0 Hacc0_raw.
   { solve_reduce_expr_match. }
 
@@ -77,7 +77,7 @@ Proof.
     simpl u64_val.
     apply reduce_u128_div_step; rep_lia. }
 
-  (* secp256k1_u128_accum_u64(&t, (uint64_t)overflow * ~N_1) *)
+  (* secp256k1_u128_accum_u64(&t, overflow * ~N_1) *)
   forward_call_u128_accum_u64 v_t t1a (mkUInt64 (overflow * N_C_1) Hov1) Tsh acc1 Hacc1_raw.
   { solve_reduce_expr_match. }
   { rewrite Ht1a.
@@ -109,7 +109,7 @@ Proof.
   (* secp256k1_u128_accum_u64(&t, r->d[2]) *)
   forward_call_u128_accum_u64 v_t carry1 (mkUInt64 d2 Hd2) Tsh t2a Ht2a.
 
-  (* secp256k1_u128_accum_u64(&t, (uint64_t)overflow * N_C_2) *)
+  (* secp256k1_u128_accum_u64(&t, overflow * N_C_2) *)
   forward_call_u128_accum_u64 v_t t2a (mkUInt64 (overflow * N_C_2) Hov2) Tsh acc2 Hacc2_raw.
   { solve_reduce_expr_match. }
   assert (Hacc2 : u128_val acc2 =
